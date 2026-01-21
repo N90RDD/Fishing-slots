@@ -129,7 +129,7 @@ body{
 .fsInfo b{font-size:14px;opacity:1}
 </style>
 </head>
-<body>
+  <body>
 
 <!-- BONUS INTRO -->
 <div class="overlay" id="bonusOverlay">
@@ -215,80 +215,88 @@ body{
     </div>
     <div class="fsInfo" id="barInfo">READY</div>
   </div>
-</div>
+</div>   
 <script>
 /* ================== CONFIG ================== */
-const COLS=5, ROWS=3;
+const COLS = 5, ROWS = 3;
 
 /* reel timing */
-const REEL_START_SPIN_MS = 350;
-const REEL_GAP_MS = 250;
-const SYMBOL_CYCLE_MS = 70;
+const REEL_START_SPIN_MS = 380;   // overall spin start
+const REEL_GAP_MS        = 210;   // time between reel stops
+const SYMBOL_CYCLE_MS    = 55;    // cycle speed while spinning (lower = faster)
 
-/* cashfish values (LOW) in BET units */
-const CASHFISH_VALUES_IN_BET = [0.2,0.3,0.5,0.7,1,1.5,2,3,5];
+/* cashfish values (LOW) in BET units (bet=100 => 0.05=£5) */
+const CASHFISH_VALUES_IN_BET = [0.05,0.08,0.1,0.12,0.15,0.2,0.25,0.3,0.4,0.5,0.75,1];
 
-/* big / mega win thresholds */
-const BIG_WIN_X = 20;
+/* big / mega win thresholds (x bet) */
+const BIG_WIN_X  = 20;
 const MEGA_WIN_X = 50;
 
 /* collector ladder */
 const COLLECTORS_FOR_X2 = 4;
 const COLLECTORS_FOR_X3 = 8;
 const EXTRA_FS_ON_MILESTONE = 10;
-const COLLECTOR_SPAWN_CHANCE_FS = 0.12;
+
+/* collector frequency (FREE SPINS only) */
+const COLLECTOR_SPAWN_CHANCE_FS = 0.08; // lower = harder
 
 /* bonus */
 const BONUS_START_FS = 10;
 const TEASE_MAX_RESPINS = 1;
 
-/* symbols */
-const symbolsBase=[
+/* SYMBOL POOLS
+   - Base: NO cashfish / collector (prevents weird base behavior)
+   - FreeSpins: cashfish + rare collector
+*/
+const symbolsBase = [
   "A","K","Q","J","10",
   "rod","boat","tackle","hook",
-  "wild","scatter","collector","cashfish"
+  "wild","scatter"
 ];
 
-const symbolsFS=[
+const symbolsFS = [
   "A","K","Q","J","10",
   "rod","boat","tackle","hook",
   "wild",
-  "cashfish","cashfish","cashfish","cashfish",
+  "cashfish","cashfish","cashfish","cashfish", // weighted
   "scatter"
 ];
 
 /* ================== STATE ================== */
-let balance=10000;
-let bet=100;
-let lastWin=0;
+let balance = 10000;
+let bet     = 100;
+let lastWin = 0;
 
-let mode="Base";
-let freeSpinsLeft=0;
-let bonusMultiplier=1;
-let bonusCollectorCount=0;
+let mode = "Base";
+let freeSpinsLeft = 0;
+let bonusMultiplier = 1;
+let bonusCollectorCount = 0;
 
-let spinning=false;
-let audioUnlocked=false;
-let teaseRespinsUsed=0;
-let bonusIntroPending=false;
+let spinning = false;
+let audioUnlocked = false;
+let teaseRespinsUsed = 0;
+let bonusIntroPending = false;
 
-let spinCtx={hasCollector:false,spawnCollector:false};
-let cycleTimers=[];
+/* per spin context */
+let spinCtx = { hasCollector:false, spawnCollector:false };
+
+/* reel cycle timers (one per reel/column) */
+let reelCycleTimers = new Array(COLS).fill(null);
 
 /* ================== DOM ================== */
-const grid=document.getElementById("grid");
-const msg=document.getElementById("msg");
-const ladderWrap=document.getElementById("ladderWrap");
+const grid = document.getElementById("grid");
+const msg  = document.getElementById("msg");
+const ladderWrap = document.getElementById("ladderWrap");
 
-const barWin=document.getElementById("barWin");
-const barInfo=document.getElementById("barInfo");
+const barWin  = document.getElementById("barWin");
+const barInfo = document.getElementById("barInfo");
 
-const bonusOverlay=document.getElementById("bonusOverlay");
-const winOverlay=document.getElementById("winOverlay");
-const winTypeEl=document.getElementById("winType");
-const winAmtEl=document.getElementById("winAmt");
+const bonusOverlay = document.getElementById("bonusOverlay");
+const winOverlay   = document.getElementById("winOverlay");
+const winTypeEl    = document.getElementById("winType");
+const winAmtEl     = document.getElementById("winAmt");
 
-/* ladder */
+/* ladder elements */
 const stage1=document.getElementById("stage1");
 const stage2=document.getElementById("stage2");
 const stage3=document.getElementById("stage3");
@@ -297,46 +305,47 @@ const pips2=document.getElementById("pips2");
 const pips3=document.getElementById("pips3");
 
 /* ================== AUDIO ================== */
-const audio={
-  bg:new Audio("assets/audio/bg.mp3"),
-  bonus:new Audio("assets/audio/bonus.mp3"),
-  spin:new Audio("assets/audio/spin.mp3")
+const audio = {
+  bg:    new Audio("assets/audio/bg.mp3"),
+  bonus: new Audio("assets/audio/bonus.mp3"),
+  spin:  new Audio("assets/audio/spin.mp3"),
 };
-audio.bg.loop=true; audio.bg.volume=0.4;
+audio.bg.loop=true;    audio.bg.volume=0.4;
 audio.bonus.loop=true; audio.bonus.volume=0.45;
 audio.spin.volume=0.6;
 
-function safePlay(a){a.play().catch(()=>{})}
-function safePause(a){try{a.pause()}catch(e){}}
+function safePlay(a){ a.play().catch(()=>{}); }
+function safePause(a){ try{a.pause()}catch(e){} }
 
 /* ================== HELPERS ================== */
-function randFrom(a){return a[Math.floor(Math.random()*a.length)]}
+function randFrom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-function setCellSymbol(cell,sym,allowValue=true){
-  const img=cell.querySelector("img");
-  img.src="assets/symbols/"+sym+".png?v="+Math.random();
-  cell.dataset.sym=sym;
+function setCellSymbol(cell, sym){
+  const img = cell.querySelector("img");
+  img.src = "assets/symbols/" + sym + ".png?v=" + Math.random();
+  cell.dataset.sym = sym;
 
-  const badge=cell.querySelector(".valueBadge");
-  badge.style.display="none";
-  cell.dataset.val="";
+  // value badges ONLY in Free Spins
+  const badge = cell.querySelector(".valueBadge");
+  badge.style.display = "none";
+  cell.dataset.val = "";
 
-  if(sym==="cashfish" && allowValue){
-    const units=randFrom(CASHFISH_VALUES_IN_BET);
-    const value=Math.round(units*bet);
-    cell.dataset.val=value;
-    badge.textContent="£"+value;
-    badge.style.display="block";
+  if(mode==="FreeSpins" && sym==="cashfish"){
+    const units = randFrom(CASHFISH_VALUES_IN_BET);
+    const value = Math.round(units * bet);
+    cell.dataset.val = value;
+    badge.textContent = "£" + value;
+    badge.style.display = "block";
   }
 }
 
 function countSymbol(sym){
   let n=0;
-  [...grid.children].forEach(c=>{if(c.dataset.sym===sym)n++});
+  [...grid.children].forEach(c=>{ if(c.dataset.sym===sym) n++; });
   return n;
 }
 
-/* ================== LADDER ================== */
+/* ================== LADDER UI ================== */
 function buildPips(el){
   el.innerHTML="";
   for(let i=0;i<4;i++){
@@ -355,37 +364,38 @@ function setPips(el,count){
 }
 
 function updateLadder(){
-  ladderWrap.style.display = (mode==="FreeSpins")?"block":"none";
-  if(mode!=="FreeSpins")return;
+  ladderWrap.style.display = (mode==="FreeSpins") ? "block" : "none";
+  if(mode!=="FreeSpins") return;
 
-  const c=bonusCollectorCount;
+  const c = bonusCollectorCount;
+
   stage1.classList.remove("active");
   stage2.classList.remove("active");
   stage3.classList.remove("active");
 
-  stage2.classList.toggle("locked",c<4);
-  stage3.classList.toggle("locked",c<8);
+  stage2.classList.toggle("locked", c < 4);
+  stage3.classList.toggle("locked", c < 8);
 
-  if(c<4){
+  if(c < 4){
     stage1.classList.add("active");
-    setPips(pips1,c); setPips(pips2,0); setPips(pips3,0);
-  }else if(c<8){
+    setPips(pips1, c); setPips(pips2, 0); setPips(pips3, 0);
+  }else if(c < 8){
     stage2.classList.add("active");
-    setPips(pips1,4); setPips(pips2,c-4); setPips(pips3,0);
+    setPips(pips1, 4); setPips(pips2, c-4); setPips(pips3, 0);
   }else{
     stage3.classList.add("active");
-    setPips(pips1,4); setPips(pips2,4); setPips(pips3,c-8);
+    setPips(pips1, 4); setPips(pips2, 4); setPips(pips3, c-8);
   }
 }
 
 /* ================== UI UPDATE ================== */
 function update(){
-  document.getElementById("bal").textContent=balance;
-  document.getElementById("bet").textContent=bet;
-  document.getElementById("mode").textContent=(mode==="FreeSpins"?"Free Spins":"Base");
-  document.getElementById("fs").textContent=freeSpinsLeft;
-  document.getElementById("mult").textContent="x"+bonusMultiplier;
-  document.getElementById("colCount").textContent=bonusCollectorCount;
+  document.getElementById("bal").textContent = balance;
+  document.getElementById("bet").textContent = bet;
+  document.getElementById("mode").textContent = (mode==="FreeSpins" ? "Free Spins" : "Base");
+  document.getElementById("fs").textContent = freeSpinsLeft;
+  document.getElementById("mult").textContent = "x"+bonusMultiplier;
+  document.getElementById("colCount").textContent = bonusCollectorCount;
 
   barInfo.innerHTML = (mode==="FreeSpins")
     ? `FREE SPINS <b>${freeSpinsLeft}</b> · x${bonusMultiplier}`
@@ -402,15 +412,15 @@ function createGrid(){
     c.className="cell";
     c.innerHTML="<img><div class='valueBadge'></div>";
     grid.appendChild(c);
-    setCellSymbol(c,randFrom(symbolsBase));
+    setCellSymbol(c, randFrom(symbolsBase));
   }
   barWin.textContent="£0";
 }
 
 /* ================== BONUS ================== */
 function showBonusIntro(){
-  document.getElementById("introFS").textContent=BONUS_START_FS;
-  document.getElementById("introMult").textContent="x1";
+  document.getElementById("introFS").textContent = BONUS_START_FS;
+  document.getElementById("introMult").textContent = "x1";
   bonusOverlay.style.display="flex";
 }
 
@@ -420,122 +430,101 @@ function startBonusFromIntro(){
   safePlay(audio.bonus);
 
   mode="FreeSpins";
-  freeSpinsLeft=BONUS_START_FS;
-  bonusMultiplier=1;
-  bonusCollectorCount=0;
-  bonusIntroPending=false;
+  freeSpinsLeft = BONUS_START_FS;
+  bonusMultiplier = 1;
+  bonusCollectorCount = 0;
+  bonusIntroPending = false;
 
   msg.textContent="BONUS START!";
   update();
-  setTimeout(()=>spin(),700);
+  setTimeout(()=>spin(), 650);
 }
 
 function endBonus(){
   mode="Base";
-  freeSpinsLeft=0;
-  bonusMultiplier=1;
+  freeSpinsLeft = 0;
+  bonusMultiplier = 1;
   safePause(audio.bonus);
   safePlay(audio.bg);
   msg.textContent="Bonus complete.";
   update();
 }
 
-/* ================== SPIN ================== */
-function startGame(){
-  if(!audioUnlocked){
-    audioUnlocked=true;
-    safePlay(audio.bg);
+/* ================== WIN COUNT-UP ================== */
+let winRAF=null;
+const COUNTUP_MS = 650;
+
+function animateWinTo(target){
+  if(winRAF) cancelAnimationFrame(winRAF);
+
+  const start = Number((barWin.textContent||"£0").replace("£","")) || 0;
+  const t0 = performance.now();
+
+  function frame(t){
+    const p = Math.min(1,(t-t0)/COUNTUP_MS);
+    const eased = 1 - Math.pow(1-p,3);
+    const v = Math.round(start + (target-start)*eased);
+    barWin.textContent = "£"+v;
+    if(p<1) winRAF=requestAnimationFrame(frame);
+    else winRAF=null;
   }
-  spin();
+  winRAF=requestAnimationFrame(frame);
 }
 
-function clearCycles(){
-  cycleTimers.forEach(t=>clearInterval(t));
-  cycleTimers=[];
+/* ================== BIG / MEGA WIN ================== */
+function showWinOverlay(type, amount){
+  winTypeEl.textContent = type;
+  winAmtEl.textContent  = "£"+amount;
+  winOverlay.style.display="flex";
+
+  const close=()=>{
+    winOverlay.style.display="none";
+    winOverlay.removeEventListener("click",close);
+  };
+  winOverlay.addEventListener("click",close);
 }
 
-function startCycling(cells){
-  clearCycles();
-  for(let col=0;col<COLS;col++){
-    cycleTimers.push(setInterval(()=>{
-      for(let row=0;row<ROWS;row++){
-        const idx=row*COLS+col;
-        const cell=cells[idx];
-        if(cell.classList.contains("spinning")){
-          setCellSymbol(cell,randFrom(symbolsBase),false);
-        }
-      }
-    },SYMBOL_CYCLE_MS));
+function maybeBigWinOverlay(amount){
+  const x = amount / bet;
+  if(x >= MEGA_WIN_X) showWinOverlay("MEGA WIN", amount);
+  else if(x >= BIG_WIN_X) showWinOverlay("BIG WIN", amount);
+}
+
+/* ================== TEASE RESPIN ==================
+   2 scatters ONLY in reels 1–4 (col 0..3) and rows 1–2 (row 0..1)
+*/
+function teaseConditionMet(){
+  const scat=[];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const s = grid.children[r*COLS+c].dataset.sym;
+      if(s==="scatter") scat.push({r,c});
+    }
   }
+  if(scat.length !== 2) return false;
+  return scat.every(p => p.c<=3 && p.r<=1);
 }
 
-function spin(){
-  if(spinning)return;
-  if(mode==="Base" && balance<bet)return;
-
-  spinning=true;
-  spinCtx={hasCollector:false,spawnCollector:(mode==="FreeSpins"&&Math.random()<COLLECTOR_SPAWN_CHANCE_FS)};
-
-  if(mode==="Base") balance-=bet;
-  if(mode==="FreeSpins") freeSpinsLeft--;
-
-  update();
-  audio.spin.currentTime=0;
-  safePlay(audio.spin);
-
-  const cells=[...grid.children];
-  cells.forEach(c=>c.classList.add("spinning"));
-  startCycling(cells);
-
-  for(let col=0;col<COLS;col++){
-    setTimeout(()=>{
-      for(let row=0;row<ROWS;row++){
-        const idx=row*COLS+col;
-        const cell=cells[idx];
-        let sym;
-        if(mode==="FreeSpins" && col===4 && spinCtx.spawnCollector && !spinCtx.hasCollector){
-          sym="collector"; spinCtx.hasCollector=true;
-        }else{
-          sym=(mode==="FreeSpins")?randFrom(symbolsFS):randFrom(symbolsBase);
-        }
-        setCellSymbol(cell,sym,true);
-        cell.classList.remove("spinning");
-        cell.classList.add("stop");
-        setTimeout(()=>cell.classList.remove("stop"),180);
-      }
-
-      if(col===COLS-1){
-        clearCycles();
-        spinning=false;
-        safePause(audio.spin);
-        onSpinComplete();
-      }
-    },REEL_START_SPIN_MS+col*REEL_GAP_MS);
-  }
-}
-  /* ================== CLUSTER PAYS (BASE GAME) ==================
-   - 5+ touching (up/down/left/right)
-   - Wild counts as any symbol
-   - Scatter + cashfish do NOT pay in base
+/* ================== CLUSTER PAYS (BASE) ==================
+   - 5+ touching (4-direction)
+   - wild counts as matching any symbol
+   - scatter/cashfish/collector don't pay in base
 */
 const CLUSTER_PAYS = {
-  A:  [0,0,0,0,0.2,0.4,0.6,1,1.5,2],
-  K:  [0,0,0,0,0.3,0.6,1,1.5,2,3],
-  Q:  [0,0,0,0,0.4,0.8,1.5,2,3,4],
-  J:  [0,0,0,0,0.5,1,2,3,4,6],
-  "10":[0,0,0,0,0.6,1.2,2.5,4,6,8],
-
-  rod:    [0,0,0,0,1,2,4,6,8,12],
-  boat:   [0,0,0,0,1.5,3,6,9,12,18],
-  tackle: [0,0,0,0,2,4,8,12,16,24],
-  hook:   [0,0,0,0,2.5,5,10,15,20,30]
+  A:  [0,0,0,0,0.15,0.3,0.45,0.7,1,1.3],
+  K:  [0,0,0,0,0.2,0.4,0.6,1,1.4,2],
+  Q:  [0,0,0,0,0.25,0.5,0.8,1.2,1.8,2.6],
+  J:  [0,0,0,0,0.3,0.6,1,1.5,2.2,3.2],
+  "10":[0,0,0,0,0.35,0.7,1.2,1.8,2.6,3.8],
+  rod:    [0,0,0,0,0.8,1.6,2.6,4,6,9],
+  boat:   [0,0,0,0,1,2,3.5,5.5,8,12],
+  tackle: [0,0,0,0,1.2,2.5,4.5,7,10,15],
+  hook:   [0,0,0,0,1.4,3,5.5,8.5,12,18]
 };
 
-function inBounds(r,c){return r>=0 && r<ROWS && c>=0 && c<COLS}
-function key(r,c){return r+"-"+c}
+function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
+function key(r,c){ return r+"-"+c; }
 
-/* Find clusters for each symbol type, allowing wilds to join.
-   Wilds are "consumed" by the first cluster they help complete (row-major scan). */
 function getClusters(){
   const visited=new Set();
   const clusters=[];
@@ -562,7 +551,6 @@ function getClusters(){
     }
   }
 
-  // scan in stable order so results are predictable
   for(const sym of Object.keys(CLUSTER_PAYS)){
     for(let r=0;r<ROWS;r++){
       for(let c=0;c<COLS;c++){
@@ -579,7 +567,6 @@ function getClusters(){
         if(acc.length>=5){
           clusters.push({sym, cells:acc});
         }else{
-          // if too small, un-visit them (so they can be used by other symbol scans)
           acc.forEach(p=>visited.delete(key(p.r,p.c)));
         }
       }
@@ -597,71 +584,15 @@ function evaluateClustersWin(){
     const pay=CLUSTER_PAYS[cl.sym];
     if(!pay) continue;
     const size=Math.min(cl.cells.length, pay.length-1);
-    const betUnits=pay[size] || 0;
+    const betUnits = pay[size] || 0;
     total += Math.round(betUnits * bet);
   }
   return total;
 }
 
-/* ================== WIN COUNT-UP ================== */
-let winRAF=null;
-const COUNTUP_MS=700;
-
-function animateWinTo(target){
-  if(winRAF) cancelAnimationFrame(winRAF);
-  const start = Number((barWin.textContent||"£0").replace("£","")) || 0;
-  const t0 = performance.now();
-
-  function frame(t){
-    const p=Math.min(1,(t-t0)/COUNTUP_MS);
-    const eased=1-Math.pow(1-p,3);
-    const v=Math.round(start+(target-start)*eased);
-    barWin.textContent="£"+v;
-    if(p<1) winRAF=requestAnimationFrame(frame);
-    else winRAF=null;
-  }
-  winRAF=requestAnimationFrame(frame);
-}
-
-/* ================== BIG / MEGA WIN ================== */
-function showWinOverlay(type, amount){
-  winTypeEl.textContent=type;
-  winAmtEl.textContent="£"+amount;
-  winOverlay.style.display="flex";
-
-  const close=()=>{
-    winOverlay.style.display="none";
-    winOverlay.removeEventListener("click",close);
-  };
-  winOverlay.addEventListener("click",close);
-}
-
-function maybeBigWinOverlay(amount){
-  const x=amount / bet;
-  if(x>=MEGA_WIN_X) showWinOverlay("MEGA WIN", amount);
-  else if(x>=BIG_WIN_X) showWinOverlay("BIG WIN", amount);
-}
-
-/* ================== SCATTER TEASE (1 free respin) ==================
-   If exactly 2 scatters are on reels 1-4 and rows 1-2, we respin once.
-   reels 1-4 => col 0..3
-   rows 1-2 => row 0..1
-*/
-function teaseConditionMet(){
-  const scat=[];
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      const s=grid.children[r*COLS+c].dataset.sym;
-      if(s==="scatter") scat.push({r,c});
-    }
-  }
-  if(scat.length!==2) return false;
-  return scat.every(p => p.c<=3 && p.r<=1);
-}
-
-/* ================== BONUS COLLECTION LOGIC ================== */
+/* ================== FREE SPINS COLLECT ================== */
 function collectCashfishIfCollectorPresent(){
-  const collectors=countSymbol("collector");
+  const collectors = countSymbol("collector");
   if(collectors<=0) return 0;
 
   let sum=0;
@@ -670,15 +601,15 @@ function collectCashfishIfCollectorPresent(){
       sum += Number(cell.dataset.val||0);
     }
   });
-  if(sum<=0) return 0;
 
-  return sum * bonusMultiplier;
+  if(sum<=0) return 0;
+  return Math.round(sum * bonusMultiplier);
 }
 
 function applyCollectorProgress(collectorsThisSpin){
   if(collectorsThisSpin<=0) return;
 
-  const before=bonusCollectorCount;
+  const before = bonusCollectorCount;
   bonusCollectorCount += collectorsThisSpin;
 
   if(before < COLLECTORS_FOR_X2 && bonusCollectorCount >= COLLECTORS_FOR_X2){
@@ -694,11 +625,103 @@ function applyCollectorProgress(collectorsThisSpin){
   }
 }
 
-/* ================== RESULT HANDLER ================== */
-function onSpinComplete(){
-  const scatters=countSymbol("scatter");
+/* ================== SPIN ENGINE ================== */
+function stopReelCycle(col){
+  if(reelCycleTimers[col]){
+    clearInterval(reelCycleTimers[col]);
+    reelCycleTimers[col]=null;
+  }
+}
 
-  /* BASE: bonus trigger */
+function startReelCycle(col){
+  stopReelCycle(col);
+  reelCycleTimers[col]=setInterval(()=>{
+    // only update cells STILL marked spinning
+    for(let row=0; row<ROWS; row++){
+      const idx=row*COLS+col;
+      const cell=grid.children[idx];
+      if(!cell.classList.contains("spinning")) continue;
+
+      const pool = (mode==="FreeSpins") ? symbolsFS : symbolsBase;
+      setCellSymbol(cell, randFrom(pool));
+    }
+  }, SYMBOL_CYCLE_MS);
+}
+
+function spin(){
+  if(spinning) return;
+  if(mode==="Base" && balance<bet) return;
+
+  spinning=true;
+
+  // reset tease counter when a normal spin completes (not inside the tease chain)
+  // (we keep it simple: let it persist until the next non-tease spin ends)
+  spinCtx = {
+    hasCollector:false,
+    spawnCollector: (mode==="FreeSpins" && Math.random() < COLLECTOR_SPAWN_CHANCE_FS)
+  };
+
+  if(mode==="Base") balance -= bet;
+  if(mode==="FreeSpins") freeSpinsLeft--;
+
+  update();
+
+  audio.spin.currentTime=0;
+  safePlay(audio.spin);
+
+  const cells=[...grid.children];
+
+  // mark spinning and start reel cycles
+  for(let col=0; col<COLS; col++){
+    for(let row=0; row<ROWS; row++){
+      cells[row*COLS+col].classList.add("spinning");
+    }
+    startReelCycle(col);
+  }
+
+  // stop reels one by one
+  for(let col=0; col<COLS; col++){
+    setTimeout(()=>{
+      // stop cycling THIS reel first (fixes late symbol swaps)
+      stopReelCycle(col);
+
+      // finalize symbols for this reel
+      for(let row=0; row<ROWS; row++){
+        const idx=row*COLS+col;
+        const cell=cells[idx];
+
+        let sym;
+        const pool = (mode==="FreeSpins") ? symbolsFS : symbolsBase;
+
+        // spawn ONE collector on last reel in FS sometimes
+        if(mode==="FreeSpins" && col===4 && spinCtx.spawnCollector && !spinCtx.hasCollector){
+          sym="collector";
+          spinCtx.hasCollector=true;
+        }else{
+          sym=randFrom(pool);
+        }
+
+        setCellSymbol(cell, sym);
+        cell.classList.remove("spinning");
+        cell.classList.add("stop");
+        setTimeout(()=>cell.classList.remove("stop"),180);
+      }
+
+      // after last reel stops
+      if(col===COLS-1){
+        safePause(audio.spin);
+        spinning=false;
+        onSpinComplete();
+      }
+    }, REEL_START_SPIN_MS + col*REEL_GAP_MS);
+  }
+}
+
+/* ================== RESULTS ================== */
+function onSpinComplete(){
+  const scatters = countSymbol("scatter");
+
+  // BASE: trigger bonus
   if(mode==="Base" && scatters>=3){
     bonusIntroPending=true;
     msg.textContent="BONUS TRIGGERED!";
@@ -707,20 +730,19 @@ function onSpinComplete(){
     return;
   }
 
-  /* BASE: scatter tease respin */
+  // BASE: tease respin
   if(mode==="Base" && teaseRespinsUsed < TEASE_MAX_RESPINS && teaseConditionMet()){
     teaseRespinsUsed++;
     msg.textContent="2 Scatters tease… Respin!";
     setTimeout(()=>{
-      // free respin: refund the bet cost of that respin
-      // (we already deducted bet when spin() ran, so add it back)
+      // free respin (refund the respin cost)
       balance += bet;
       spin();
     }, 650);
     return;
   }
 
-  /* FREE SPINS logic */
+  // FREE SPINS
   if(mode==="FreeSpins"){
     const collectorsThisSpin = countSymbol("collector");
     applyCollectorProgress(collectorsThisSpin);
@@ -741,14 +763,14 @@ function onSpinComplete(){
     update();
 
     if(freeSpinsLeft>0){
-      setTimeout(()=>spin(), 900);
+      setTimeout(()=>spin(), 850);
     }else{
-      setTimeout(()=>endBonus(), 800);
+      setTimeout(()=>endBonus(), 700);
     }
     return;
   }
 
-  /* BASE: CLUSTER PAYS */
+  // BASE: cluster pays
   const win = evaluateClustersWin();
   lastWin = win;
 
@@ -762,30 +784,13 @@ function onSpinComplete(){
     animateWinTo(0);
   }
 
-  update();
-}
+  // reset tease counter after a completed base resolution
+  teaseRespinsUsed = 0;
 
-/* ================== PATCH: ensure cycling uses correct pool ================== */
-function startCycling(cells){
-  clearCycles();
-  for(let col=0;col<COLS;col++){
-    cycleTimers.push(setInterval(()=>{
-      for(let row=0;row<ROWS;row++){
-        const idx=row*COLS+col;
-        const cell=cells[idx];
-        if(cell.classList.contains("spinning")){
-          const pool = (mode==="FreeSpins") ? symbolsFS : symbolsBase;
-          setCellSymbol(cell, randFrom(pool), false);
-        }
-      }
-    },SYMBOL_CYCLE_MS));
-  }
+  update();
 }
 
 /* ================== STARTUP ================== */
 createGrid();
 update();
-</script>
-
-</body>
-</html>
+    </script>
