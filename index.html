@@ -217,6 +217,13 @@ body{
   </div>
 </div>   
 <script>
+  function startGame(){
+  if(!audioUnlocked){
+    audioUnlocked = true;
+    safePlay(audio.bg);
+  }
+  spin();
+  }
 /* ================== CONFIG ================== */
 const COLS = 5, ROWS = 3;
 
