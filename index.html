@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fishing Splash</title>
+
+<style>
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  height:100%;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:#fff;
+}
+
+/* background */
+body{
+  background:
+    url("assets/bg.jpg") center / cover no-repeat,
+    linear-gradient(180deg,#061a25,#0b3a52);
+}
+
+.app{max-width:900px;margin:auto;padding:12px}
+
+/* header */
+.header{
+  background:rgba(0,0,0,.45);
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:12px;
+  backdrop-filter:blur(6px);
+}
+.title{font-size:22px;font-weight:900}
+.sub{font-size:13px;opacity:.85}
+
+/* stats */
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pill{
+  padding:6px 10px;
+  background:rgba(0,0,0,.45);
+  border-radius:999px;
+  font-size:14px;
+}
+
+/* reels */
+.reels{
+  background:rgba(0,0,0,.35);
+  border-radius:20px;
+  padding:14px;
+  backdrop-filter:blur(6px);
+}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+
+.cell{
+  height:90px;
+  border-radius:16px;
+  background:rgba(0,0,0,.35);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
+}
+.cell img{
+  width:64px;height:64px;object-fit:contain;
+  filter:drop-shadow(0 8px 14px rgba(0,0,0,.7));
+}
+
+/* cashfish value badge */
+.valueBadge{
+  position:absolute;
+  bottom:6px; right:6px;
+  padding:2px 6px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  background:rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.15);
+  display:none;
+}
+
+/* spinning */
+.spinning img{animation:spinMove .1s infinite linear;filter:blur(2px)}
+@keyframes spinMove{from{transform:translateY(-6px)}to{transform:translateY(6px)}}
+.stop img{animation:stopBounce .18s ease-out}
+@keyframes stopBounce{
+  0%{transform:translateY(-10px)}
+  60%{transform:translateY(3px)}
+  100%{transform:translateY(0)}
+}
+
+/* message */
+.msg{
+  margin-top:10px;
+  padding:10px;
+  background:rgba(0,0,0,.45);
+  border-radius:14px;
+  font-size:14px;
+}
+
+/* controls */
+.controls{
+  margin-top:12px;
+  background:rgba(0,0,0,.45);
+  border-radius:20px;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.btn{
+  padding:12px 16px;
+  border-radius:16px;
+  border:none;
+  background:rgba(255,255,255,.15);
+  color:#fff;
+  font-size:15px;
+}
+.spin{
+  background:linear-gradient(180deg,#ffcf5a,#d9a62c);
+  color:#000;
+  font-weight:900;
+  min-width:160px;
+}
+
+/* BONUS INTRO OVERLAY */
+.overlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+  z-index:9999;
+}
+.overlayCard{
+  width:min(520px,100%);
+  border-radius:20px;
+  padding:18px;
+  background:rgba(20,30,40,.95);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+  text-align:center;
+}
+.overlayTitle{
+  font-size:26px;
+  font-weight:1000;
+  letter-spacing:1px;
+}
+.overlaySub{
+  opacity:.9;
+  margin-top:8px;
+  line-height:1.35;
+  font-size:14px;
+}
+.bigPillRow{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin:14px 0;
+}
+.bigPill{
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.10);
+  padding:10px 12px;
+  border-radius:999px;
+  font-weight:800;
+}
+.primaryBtn{
+  margin-top:10px;
+  width:100%;
+  padding:14px 16px;
+  border:none;
+  border-radius:16px;
+  font-size:16px;
+  font-weight:1000;
+  background:linear-gradient(180deg,#ffcf5a,#d9a62c);
+  color:#000;
+}
+.smallNote{
+  margin-top:10px;
+  opacity:.8;
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- BONUS INTRO -->
+<div class="overlay" id="bonusOverlay">
+  <div class="overlayCard">
+    <div class="overlayTitle">BONUS FEATURE!</div>
+    <div class="overlaySub">
+      Triggered by <b>3+ Scatters</b> 🎣<br>
+      Collect <b>Cashfish</b> with <b>Collectors</b>.<br>
+      Reach <b>4 Collectors</b> = +10 spins & x2. Reach <b>8</b> = +10 spins & x3.
+    </div>
+
+    <div class="bigPillRow">
+      <div class="bigPill">Free Spins: <span id="introFS">10</span></div>
+      <div class="bigPill">Multiplier: <span id="introMult">x1</span></div>
+    </div>
+
+    <button class="primaryBtn" onclick="startBonusFromIntro()">START FREE SPINS</button>
+    <div class="smallNote">Music switches when you press START.</div>
+  </div>
+</div>
+
+<div class="app">
+
+  <div class="header">
+    <div class="title">FISHING SPLASH</div>
+    <div class="sub">Bonus Intro · Free Spins · Cashfish Collect</div>
+
+    <div class="stats">
+      <div class="pill">Mode: <span id="mode">Base</span></div>
+      <div class="pill">FS: <span id="fs">0</span></div>
+      <div class="pill">Mult: <span id="mult">x1</span></div>
+      <div class="pill">Collectors: <span id="colCount">0</span></div>
+      <div class="pill">Balance: <span id="bal">10000</span></div>
+      <div class="pill">Bet: <span id="bet">100</span></div>
+      <div class="pill">Last Win: <span id="last">0</span></div>
+    </div>
+  </div>
+
+  <div class="reels">
+    <div class="grid" id="grid"></div>
+    <div class="msg" id="msg">Tap SPIN to start (music unlocks on first tap)</div>
+  </div>
+
+  <div class="controls">
+    <div>
+      <button class="btn" onclick="bet=Math.max(50,bet-50);update()">-</button>
+      <button class="btn" onclick="bet+=50;update()">+</button>
+    </div>
+    <button class="btn spin" onclick="startGame()">SPIN</button>
+  </div>
+
+</div>
+
+<script>
+/* ---------------- SETTINGS ---------------- */
+const COLS=5, ROWS=3;
+
+const symbolsBase=[
+  "A","K","Q","J","10",
+  "rod","boat","tackle","hook",
+  "wild","scatter","collector","cashfish"
+];
+
+// In Free Spins you usually see more cashfish + collectors.
+// Simple weighted pool (more repeats = more likely):
+const symbolsFS=[
+  "A","K","Q","J","10",
+  "rod","boat","tackle","hook",
+  "wild",
+  "cashfish","cashfish","cashfish","cashfish",
+  "collector","collector",
+  "scatter"
+];
+
+const BONUS_START_FS = 10;
+
+// “Tease respin” condition (unchanged): exactly 2 scatters in cols 0-3 and rows 0-1
+const TEASE_MAX_RESPINS = 1;
+
+/* Cashfish values (in BET units). You can tweak later. */
+const CASHFISH_VALUES_IN_BET = [1,2,3,4,5,8,10,15,20];
+
+/* Collector milestones */
+const COLLECTORS_FOR_X2 = 4;
+const COLLECTORS_FOR_X3 = 8;
+const EXTRA_FS_ON_MILESTONE = 10;
+
+/* ---------------- STATE ---------------- */
+let balance=10000;
+let bet=100;
+let lastWin=0;
+
+let spinning=false;
+let audioUnlocked=false;
+
+let mode="Base";        // "Base" or "FreeSpins"
+let freeSpinsLeft=0;
+
+let bonusMultiplier=1;  // 1,2,3
+let bonusCollectorCount=0;
+
+let teaseRespinsUsed=0;
+let bonusIntroPending=false;
+
+/* ---------------- DOM ---------------- */
+const grid=document.getElementById("grid");
+const msg=document.getElementById("msg");
+const bonusOverlay=document.getElementById("bonusOverlay");
+
+/* ---------------- AUDIO (MOBILE SAFE) ---------------- */
+const audio={
+  bg:new Audio("assets/audio/bg.mp3"),
+  bonus:new Audio("assets/audio/bonus.mp3"), // if missing, we fallback
+  spin:new Audio("assets/audio/spin.mp3")
+};
+audio.bg.loop=true; audio.bg.volume=0.4;
+audio.spin.volume=0.6;
+audio.bonus.loop=true; audio.bonus.volume=0.45;
+
+function safePlay(a){
+  return a.play().catch(()=>{});
+}
+function safePause(a){
+  try{ a.pause(); }catch(e){}
+}
+
+/* Must be called from tap */
+function startGame(){
+  if(!audioUnlocked){
+    audioUnlocked=true;
+    audio.bg.currentTime=0;
+    safePlay(audio.bg);
+    setTimeout(()=>spin(),50);
+  }else{
+    spin();
+  }
+}
+
+/* ---------------- HELPERS ---------------- */
+function randFrom(arr){
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+function randSym(){
+  return (mode==="FreeSpins") ? randFrom(symbolsFS) : randFrom(symbolsBase);
+}
+
+function setCellSymbol(cell, sym){
+  const img=cell.querySelector("img");
+  img.src="assets/symbols/"+sym+".png?v="+Math.random();
+  cell.dataset.sym = sym;
+
+  // reset cashfish value unless it is cashfish
+  const badge = cell.querySelector(".valueBadge");
+  cell.dataset.val = "";
+  badge.style.display = "none";
+  badge.textContent = "";
+
+  if(sym==="cashfish"){
+    // pick a value in bet units and store actual money value
+    const units = randFrom(CASHFISH_VALUES_IN_BET);
+    const value = units * bet;
+    cell.dataset.val = String(value);
+    badge.textContent = "£" + value;
+    badge.style.display = "block";
+  }
+}
+
+function countSymbol(sym){
+  let n=0;
+  for(const cell of grid.children){
+    if((cell.dataset.sym||"")===sym) n++;
+  }
+  return n;
+}
+
+function update(){
+  document.getElementById("bal").textContent=balance;
+  document.getElementById("bet").textContent=bet;
+  document.getElementById("last").textContent=lastWin;
+  document.getElementById("mode").textContent=(mode==="FreeSpins" ? "Free Spins" : "Base");
+  document.getElementById("fs").textContent=freeSpinsLeft;
+  document.getElementById("mult").textContent="x"+bonusMultiplier;
+  document.getElementById("colCount").textContent=bonusCollectorCount;
+}
+
+/* ---------------- GRID INIT ---------------- */
+function createGrid(){
+  grid.innerHTML="";
+  for(let i=0;i<COLS*ROWS;i++){
+    const c=document.createElement("div");
+    c.className="cell";
+    const img=document.createElement("img");
+    img.alt="";
+    const badge=document.createElement("div");
+    badge.className="valueBadge";
+    c.appendChild(img);
+    c.appendChild(badge);
+    grid.appendChild(c);
+  }
+  for(const cell of grid.children){
+    setCellSymbol(cell, randSym());
+  }
+}
+
+/* ---------------- TEASE CONDITION ---------------- */
+function teaseConditionMet(){
+  const scatters=[];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const idx=r*COLS+c;
+      const sym=grid.children[idx].dataset.sym;
+      if(sym==="scatter") scatters.push({r,c});
+    }
+  }
+  if(scatters.length!==2) return false;
+  // cols 0-3 and rows 0-1
+  return scatters.every(p => p.c<=3 && p.r<=1);
+}
+
+/* ---------------- BONUS FLOW ---------------- */
+function showBonusIntro(){
+  // prepare intro numbers
+  document.getElementById("introFS").textContent = BONUS_START_FS;
+  document.getElementById("introMult").textContent = "x1";
+  bonusOverlay.style.display="flex";
+}
+
+function startBonusFromIntro(){
+  // this tap counts as user interaction so music switch will work
+  bonusOverlay.style.display="none";
+
+  // switch music: base -> bonus (fallback if bonus missing)
+  safePause(audio.bg);
+  audio.bonus.currentTime=0;
+  safePlay(audio.bonus).catch(()=>{
+    // if bonus.mp3 missing, keep base
+    safePlay(audio.bg);
+  });
+
+  // enter bonus state
+  mode="FreeSpins";
+  freeSpinsLeft = BONUS_START_FS;
+  bonusMultiplier = 1;
+  bonusCollectorCount = 0;
+  bonusIntroPending=false;
+
+  msg.textContent = `BONUS START! ${freeSpinsLeft} Free Spins (x${bonusMultiplier})`;
+  update();
+
+  // auto start first free spin
+  setTimeout(()=>spin(), 650);
+}
+
+function endBonus(){
+  mode="Base";
+  freeSpinsLeft=0;
+  bonusMultiplier=1;
+
+  // switch music back
+  safePause(audio.bonus);
+  safePlay(audio.bg);
+
+  msg.textContent="Bonus complete. Back to Base.";
+  update();
+}
+
+/* ---------------- WIN MECHANIC (BONUS) ---------------- */
+function collectCashfishIfCollectorPresent(){
+  // if no collector, no collect
+  const collectors = countSymbol("collector");
+  if(collectors<=0) return 0;
+
+  // sum all cashfish values on grid
+  let sum=0;
+  for(const cell of grid.children){
+    if(cell.dataset.sym==="cashfish"){
+      const v = Number(cell.dataset.val||"0");
+      sum += v;
+    }
+  }
+
+  if(sum<=0) return 0;
+
+  // multiply by bonus multiplier
+  const win = sum * bonusMultiplier;
+  return win;
+}
+
+function applyCollectorProgress(collectorsThisSpin){
+  if(collectorsThisSpin<=0) return;
+
+  const before = bonusCollectorCount;
+  bonusCollectorCount += collectorsThisSpin;
+
+  // milestone: reach 4 -> +10 FS, x2
+  if(before < COLLECTORS_FOR_X2 && bonusCollectorCount >= COLLECTORS_FOR_X2){
+    freeSpinsLeft += EXTRA_FS_ON_MILESTONE;
+    bonusMultiplier = Math.max(bonusMultiplier, 2);
+    msg.textContent = `LEVEL UP! +${EXTRA_FS_ON_MILESTONE} FS • Wins now x${bonusMultiplier}`;
+  }
+
+  // milestone: reach 8 -> +10 FS, x3
+  if(before < COLLECTORS_FOR_X3 && bonusCollectorCount >= COLLECTORS_FOR_X3){
+    freeSpinsLeft += EXTRA_FS_ON_MILESTONE;
+    bonusMultiplier = Math.max(bonusMultiplier, 3);
+    msg.textContent = `LEVEL UP! +${EXTRA_FS_ON_MILESTONE} FS • Wins now x${bonusMultiplier}`;
+  }
+}
+
+/* ---------------- SPIN ENGINE ---------------- */
+function spin(){
+  const isFree = (mode==="FreeSpins" && freeSpinsLeft>0);
+
+  // paid spin resets tease counter
+  if(!isFree){
+    teaseRespinsUsed=0;
+  }
+
+  spinInternal({
+    cost: isFree ? 0 : bet,
+    allowTease: true,
+    isFreeSpin: isFree
+  });
+}
+
+function spinInternal({cost, allowTease, isFreeSpin}){
+  if(spinning) return;
+
+  if(cost>0 && balance<cost){
+    msg.textContent="Not enough balance!";
+    return;
+  }
+
+  // if bonus intro pending, block spins until intro start
+  if(bonusIntroPending){
+    msg.textContent="Bonus ready — press START!";
+    return;
+  }
+
+  spinning=true;
+
+  if(cost>0) balance -= cost;
+
+  if(isFreeSpin){
+    freeSpinsLeft = Math.max(0, freeSpinsLeft - 1);
+  }
+
+  update();
+
+  audio.spin.currentTime=0;
+  safePlay(audio.spin);
+
+  const cells=[...document.querySelectorAll(".cell")];
+  cells.forEach(c=>c.classList.add("spinning"));
+
+  for(let col=0; col<COLS; col++){
+    setTimeout(()=>{
+      for(let row=0; row<ROWS; row++){
+        const idx=row*COLS+col;
+        const cell=cells[idx];
+        setCellSymbol(cell, randSym());
+        cell.classList.remove("spinning");
+        cell.classList.add("stop");
+        setTimeout(()=>cell.classList.remove("stop"),200);
+      }
+
+      if(col===COLS-1){
+        safePause(audio.spin);
+        spinning=false;
+        onSpinComplete(allowTease, isFreeSpin);
+      }
+    }, 400 + col*250);
+  }
+}
+
+function onSpinComplete(allowTease, wasFreeSpin){
+  const scatterCount = countSymbol("scatter");
+
+  // BONUS trigger only in BASE (avoid re-triggering inside bonus)
+  if(mode==="Base" && scatterCount>=3){
+    bonusIntroPending=true;
+    msg.textContent="BONUS TRIGGERED!";
+    update();
+    showBonusIntro();
+    return;
+  }
+
+  // TEASE respin in BASE only
+  if(
+    mode==="Base" &&
+    allowTease &&
+    teaseRespinsUsed < TEASE_MAX_RESPINS &&
+    teaseConditionMet()
+  ){
+    teaseRespinsUsed++;
+    msg.textContent="2 Scatters tease… Respin!";
+    setTimeout(()=>{
+      spinInternal({cost:0, allowTease:false, isFreeSpin:false});
+    }, 650);
+    return;
+  }
+
+  // BONUS logic
+  if(mode==="FreeSpins"){
+    const collectorsThisSpin = countSymbol("collector");
+    applyCollectorProgress(collectorsThisSpin);
+
+    const win = collectCashfishIfCollectorPresent();
+    lastWin = win;
+
+    if(win>0){
+      balance += win;
+      msg.textContent = `COLLECT! Win £${win} (x${bonusMultiplier}) • FS left: ${freeSpinsLeft}`;
+    }else{
+      msg.textContent = `Free Spin… FS left: ${freeSpinsLeft} (x${bonusMultiplier})`;
+    }
+
+    update();
+
+    // auto-run remaining FS
+    if(freeSpinsLeft>0){
+      setTimeout(()=>spin(), 800);
+    }else{
+      setTimeout(()=>endBonus(), 700);
+    }
+    return;
+  }
+
+  // BASE end
+  lastWin = 0;
+  msg.textContent="Ready. Get 3+ Scatter for Free Spins.";
+  update();
+}
+
+/* INIT */
+createGrid();
+update();
+</script>
+
+</body>
+</html>
