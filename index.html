@@ -258,3 +258,80 @@
     }
   </style>
 </head>
+<body>
+  <div class="app">
+
+    <!-- HEADER -->
+    <div class="glass header">
+      <div class="title">FISHING SPLASH</div>
+      <div class="sub">Big Bass–style · Free Spins · Collectors</div>
+
+      <div class="stats">
+        <div class="pill">Balance: <b>£<span id="bal">10000</span></b></div>
+        <div class="pill">Bet: <b>£<span id="bet">1.00</span></b></div>
+        <div class="pill">Last Win: <b>£<span id="last">0</span></b></div>
+        <div class="pill" id="modePill">Mode: <b id="modeTxt">Base</b></div>
+      </div>
+    </div>
+
+    <!-- REELS -->
+    <div class="glass reels">
+      <div class="topBar">
+        <div class="banner" id="banner">PLACE YOUR BETS!</div>
+      </div>
+
+      <div class="grid" id="grid"></div>
+
+      <div class="msg">
+        <div id="msg">Ready. Get 3+ Scatter for Free Spins.</div>
+        <div style="opacity:.75;font-size:12px;">For fun only</div>
+      </div>
+    </div>
+
+    <!-- BOTTOM WIN BAR -->
+    <div class="glass winbar">
+      <div>
+        <div class="winAmount" id="barWin">£0</div>
+        <div class="winInfo" id="barInfo">WIN</div>
+      </div>
+
+      <button class="btn spin" id="spinBtn">SPIN</button>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="glass controls">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn" id="betDown">- BET</button>
+        <button class="btn" id="betUp">+ BET</button>
+        <button class="btn" id="maxBet">MAX</button>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn" id="soundBtn">SOUND: ON</button>
+        <button class="btn" id="autoBtn">AUTO: OFF</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BONUS INTRO OVERLAY -->
+  <div class="overlay" id="bonusOverlay">
+    <div class="modal">
+      <h2>FREE SPINS!</h2>
+      <p id="bonusText">You triggered 10 Free Spins.</p>
+      <button class="modalBtn" id="bonusStartBtn">START</button>
+    </div>
+  </div>
+
+  <!-- BIG / MEGA WIN OVERLAY -->
+  <div class="overlay" id="winOverlay">
+    <div class="modal">
+      <h2 id="winTitle">BIG WIN!</h2>
+      <p style="font-size:34px;font-weight:1000;margin:10px 0;">
+        £<span id="winAmount">0</span>
+      </p>
+      <button class="modalBtn" id="winOkBtn">OK</button>
+    </div>
+  </div>
+
+  <!-- SCRIPT will be Chunk 3 + 4 -->
