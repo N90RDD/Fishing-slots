@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+  <meta name="theme-color" content="#07131b"/>
+  <title>Fishing Splash Slots</title>
+
+  <style>
+    :root{
+      --bg:#07131b;
+      --panel: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.18);
+      --text:#f3fbff;
+      --muted: rgba(243,251,255,.75);
+      --gold:#ffcf5a;
+      --aqua:#5fe1ff;
+      --good:#7bffb2;
+      --bad:#ff6b6b;
+      --shadow: 0 20px 80px rgba(0,0,0,.45);
+    }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body{ height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      overscroll-behavior:none; touch-action:manipulation;
+    }
+
+    /* Background (bg.jpg optional but recommended) */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background:
+        radial-gradient(1100px 650px at 50% 10%, rgba(95,225,255,.26), transparent 55%),
+        radial-gradient(900px 600px at 10% 90%, rgba(255,207,90,.18), transparent 60%),
+        radial-gradient(900px 600px at 90% 85%, rgba(123,255,178,.16), transparent 60%),
+        url("assets/bg.jpg"),
+        linear-gradient(180deg, #05202d 0%, #0b3a52 45%, #08202c 100%);
+      background-size: cover, cover, cover, cover, cover;
+      background-position: center, center, center, center, center;
+      filter: saturate(1.05) contrast(1.04);
+      z-index:-3;
+    }
+    /* Bubbles overlay */
+    body::after{
+      content:"";
+      position:fixed; inset:0;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,.16) 0 2px, transparent 3px),
+        radial-gradient(circle at 40% 60%, rgba(255,255,255,.13) 0 3px, transparent 4px),
+        radial-gradient(circle at 70% 35%, rgba(255,255,255,.13) 0 2px, transparent 3px),
+        radial-gradient(circle at 85% 70%, rgba(255,255,255,.11) 0 3px, transparent 4px);
+      background-size: 220px 220px, 280px 280px, 240px 240px, 320px 320px;
+      opacity:.45;
+      z-index:-2;
+      animation: drift 14s linear infinite;
+      pointer-events:none;
+    }
+    @keyframes drift{ from{ transform: translateY(0); } to{ transform: translateY(-80px); } }
+
+    .wrap{
+      min-height:100%;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      gap:12px;
+      padding: calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .header{
+      border-radius: 20px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      border: 1px solid rgba(255,255,255,.16);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      position: relative;
+      overflow:hidden;
+    }
+    .header::before{
+      content:"";
+      position:absolute; inset:-60px -60px auto -60px;
+      height:120px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+      transform: rotate(12deg);
+      opacity:.55;
+      pointer-events:none;
+    }
+    .logoRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .title{ font-weight:1000; letter-spacing:.5px; font-size:22px; text-shadow:0 8px 24px rgba(0,0,0,.55); }
+    .sub{ color:var(--muted); font-size:13px; margin-top:2px; }
+
+    .pill{
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.20);
+      border: 1px solid rgba(255,255,255,.18);
+      display:flex; gap:8px; align-items:center;
+      user-select:none;
+    }
+    .stats{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+
+    .reels{
+      border-radius: 22px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+      border: 1px solid rgba(255,255,255,.16);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+    .reels::after{
+      content:"";
+      position:absolute; inset:0;
+      background: radial-gradient(800px 260px at 50% 0%, rgba(255,255,255,.18), transparent 60%);
+      pointer-events:none;
+    }
+
+    /* Place your bets banner */
+    .banner{
+      position:absolute;
+      left:14px; right:14px; top:12px;
+      z-index:3;
+      display:flex; align-items:center; justify-content:center;
+      pointer-events:none;
+    }
+    .banner .chip{
+      padding:10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+      font-weight: 1000;
+      letter-spacing:.8px;
+      color: rgba(255,207,90,.95);
+      text-shadow: 0 8px 18px rgba(0,0,0,.55);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .banner.hide .chip{
+      opacity:0;
+      transform: translateY(-10px);
+      transition: opacity .25s ease, transform .25s ease;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap:10px;
+      position:relative;
+      z-index:1;
+      margin-top: 48px; /* leaves room for banner */
+    }
+
+    .cell{
+      border-radius: 18px;
+      min-height: 86px;
+      display:grid;
+      place-items:center;
+      border: 1px solid rgba(255,255,255,.14);
+      background:
+        radial-gradient(80px 50px at 50% 20%, rgba(255,255,255,.12), transparent 65%),
+        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.25));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+      position:relative;
+      overflow:hidden;
+      transform: translateZ(0);
+    }
+
+    .sym{
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 14px rgba(0,0,0,.55));
+      transform: translateZ(0);
+      transition: transform .12s ease;
+    }
+
+    /* Reel blur while spinning */
+    .spinning .sym{
+      filter: blur(1.6px) drop-shadow(0 12px 16px rgba(0,0,0,.55));
+      transform: translateY(6px);
+    }
+
+    /* Bounce on stop */
+    @keyframes bounceStop{
+      0%{ transform: translateY(10px) scale(.98); }
+      60%{ transform: translateY(-6px) scale(1.01); }
+      100%{ transform: translateY(0) scale(1.0); }
+    }
+    .cell.bounce .sym{
+      animation: bounceStop .18s ease-out;
+    }
+
+    @media (max-width: 520px){
+      .cell{ min-height: 78px; }
+      .sym{ width: 54px; height: 54px; }
+      .grid{ margin-top: 52px; }
+    }
+
+    .tag{
+      position:absolute; top:8px; left:10px;
+      font-size:11px; color:var(--muted);
+      padding:3px 7px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.18);
+      display:none;
+    }
+    .cash{
+      position:absolute; bottom:8px; right:10px;
+      font-size:12px; font-weight:1000;
+      padding:3px 7px; border-radius:999px;
+      border:1px solid rgba(255,207,90,.32);
+      background:rgba(255,207,90,.10);
+      color:rgba(255,207,90,.95);
+      display:none;
+    }
+
+    .msg{
+      margin-top:10px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.14);
+      color: var(--muted);
+      display:flex; justify-content:space-between; gap:10px; align-items:center;
+    }
+    .msg strong{ color:var(--text); }
+
+    .bottomBar{
+      display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+      padding: 12px;
+      border-radius: 20px;
+      background: rgba(0,0,0,.24);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.28);
+    }
+    .btn{
+      cursor:pointer;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      user-select:none;
+    }
+    .btn:active{ transform: scale(.98); }
+    .btn.primary{
+      background: radial-gradient(circle at 50% 30%, rgba(255,207,90,.55), rgba(255,207,90,.18));
+      border-color: rgba(255,207,90,.55);
+      font-weight: 1000;
+      letter-spacing:.6px;
+      min-width: 200px;
+    }
+    .btn.warn{
+      background: radial-gradient(circle at 50% 30%, rgba(95,225,255,.30), rgba(95,225,255,.10));
+      border-color: rgba(95,225,255,.45);
+      font-weight: 900;
+    }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .winGlow{ outline: 2px solid rgba(95,225,255,.75); box-shadow: 0 0 0 6px rgba(95,225,255,.12); }
+    .featureGlow{ outline: 2px solid rgba(255,207,90,.85); box-shadow: 0 0 0 6px rgba(255,207,90,.12); }
+
+    /* BIG WIN overlay */
+    .overlay{
+      position: fixed; inset: 0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 999;
+      background: radial-gradient(800px 500px at 50% 45%, rgba(0,0,0,.65), rgba(0,0,0,.88));
+      backdrop-filter: blur(6px);
+      padding: 18px;
+    }
+    .overlay.show{ display:flex; }
+    .winCard{
+      width: min(720px, 94vw);
+      border-radius: 26px;
+      padding: 18px 18px 16px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      box-shadow: 0 30px 120px rgba(0,0,0,.55);
+      position:relative;
+      overflow:hidden;
+      text-align:center;
+    }
+    .winCard::before{
+      content:"";
+      position:absolute; inset:-80px -80px auto -80px;
+      height:160px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+      transform: rotate(12deg);
+      opacity:.55;
+    }
+    .winTitle{
+      font-weight: 1000;
+      letter-spacing: 1.2px;
+      font-size: clamp(26px, 6vw, 52px);
+      margin: 6px 0 8px;
+      text-shadow: 0 14px 30px rgba(0,0,0,.55);
+    }
+    .winTitle.big{ color: rgba(255,207,90,.98); }
+    .winTitle.mega{ color: rgba(95,225,255,.98); }
+    .winTitle.super{ color: rgba(123,255,178,.98); }
+    .winAmount{
+      font-weight: 1000;
+      font-size: clamp(28px, 7vw, 60px);
+      margin: 0 0 8px;
+      color: rgba(243,251,255,.98);
+      text-shadow: 0 14px 30px rgba(0,0,0,.55);
+    }
+    .winHint{
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    .winBtns{
+      display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+      margin-top: 12px;
+    }
+
+    /* Auto panel */
+    .modal{
+      position: fixed; inset:0;
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      z-index: 1000;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      padding: 12px;
+    }
+    .modal.show{ display:flex; }
+    .sheet{
+      width: min(740px, 96vw);
+      border-radius: 22px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      box-shadow: 0 30px 120px rgba(0,0,0,.55);
+    }
+    .sheet h3{
+      margin: 0 0 10px;
+      font-size: 16px;
+      letter-spacing: .4px;
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:10px;
+    }
+    @media (max-width: 520px){
+      .grid2{ grid-template-columns: repeat(2, 1fr); }
+    }
+    .toggleRow{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      margin-top: 10px;
+    }
+    .check{
+      display:flex; gap:8px; align-items:center;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.20);
+      user-select:none;
+    }
+    .check input{ transform: scale(1.2); }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="header">
+      <div class="logoRow">
+        <div>
+          <div class="title">FISHING SPLASH</div>
+          <div class="sub">Big Bass-style: Free Spins Levels + Collectors + Big Wins</div>
+        </div>
+        <div class="pill">
+          Mode: <strong id="mode">Base</strong>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="pill">Balance: <strong id="bal">10000</strong></div>
+        <div class="pill">Bet: <strong id="bet">100</strong></div>
+        <div class="pill">Last Win: <strong id="last">0</strong></div>
+        <div class="pill">FS Level: <strong id="lvl">-</strong></div>
+        <div class="pill">Auto: <strong id="autoStat">Off</strong></div>
+      </div>
+    </div>
+
+    <div class="reels" id="reelsBox">
+      <div class="banner" id="banner"><div class="chip" id="bannerText">PLACE YOUR BETS!</div></div>
+      <div class="grid" id="grid"></div>
+
+      <div class="msg" id="msg">
+        <span>Wild • Scatter (3+ = Free Spins) • In Free Spins: Cash Fish + Collector. Levels increase collector chance.</span>
+        <span style="font-size:13px;">For fun only</span>
+      </div>
+    </div>
+
+    <div class="bottomBar">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn" id="betDown">-</button>
+        <div class="pill">BET</div>
+        <button class="btn" id="betUp">+</button>
+        <button class="btn" id="maxBet">MAX</button>
+        <button class="btn" id="mute">Sound: On</button>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn warn" id="autoBtn">AUTO</button>
+        <button class="btn primary" id="spin">SPIN</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Big win overlay -->
+  <div class="overlay" id="winOverlay">
+    <div class="winCard">
+      <div class="winTitle big" id="winTitle">BIG WIN</div>
+      <div class="winAmount" id="winAmount">0</div>
+      <p class="winHint" id="winHint">Tap collect to continue</p>
+      <div class="winBtns">
+        <button class="btn primary" id="collectBtn">COLLECT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-play panel -->
+  <div class="modal" id="autoModal" aria-hidden="true">
+    <div class="sheet">
+      <h3>Auto Play</h3>
+
+      <div class="grid2" style="margin-bottom:10px;">
+        <button class="btn" data-autospins="10">10 Spins</button>
+        <button class="btn" data-autospins="25">25 Spins</button>
+        <button class="btn" data-autospins="50">50 Spins</button>
+        <button class="btn" data-autospins="100">100 Spins</button>
+      </div>
+
+      <div class="toggleRow">
+        <label class="check">
+          <input type="checkbox" id="stopOnFeature" checked />
+          Stop on feature (Free Spins)
+        </label>
+        <label class="check">
+          <input type="checkbox" id="stopOnBig" checked />
+          Stop on big win (≥ 20x bet)
+        </label>
+        <label class="check">
+          <input type="checkbox" id="stopOnZero" />
+          Stop if balance too low
+        </label>
+      </div>
+
+      <div class="toggleRow" style="justify-content:space-between;">
+        <button class="btn" id="closeAuto">Close</button>
+        <button class="btn primary" id="stopAutoNow">Stop Auto</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ============================
+  // PNG SLOT — Big Bass style+
+  // ============================
+  const REELS = 5, ROWS = 3;
+  const Type = { REG:"REG", WILD:"WILD", SCAT:"SCAT", CASH:"CASH", COL:"COL" };
+
+  // PNG mapping (filenames must match exactly)
+  const SYM = {
+    // Cards
+    A:  {k:"A",  img:"assets/symbols/A.png",  t:Type.REG, w:20, pay:{3:2,4:4,5:8}},
+    K:  {k:"K",  img:"assets/symbols/K.png",  t:Type.REG, w:18, pay:{3:3,4:6,5:12}},
+    Q:  {k:"Q",  img:"assets/symbols/Q.png",  t:Type.REG, w:16, pay:{3:4,4:8,5:16}},
+    J:  {k:"J",  img:"assets/symbols/J.png",  t:Type.REG, w:14, pay:{3:5,4:10,5:20}},
+    T:  {k:"10", img:"assets/symbols/10.png", t:Type.REG, w:12, pay:{3:6,4:12,5:24}},
+
+    // Fishing
+    R:  {k:"ROD",  img:"assets/symbols/rod.png",    t:Type.REG, w:10, pay:{3:8,4:16,5:35}},
+    B:  {k:"BOAT", img:"assets/symbols/boat.png",   t:Type.REG, w:8,  pay:{3:10,4:22,5:50}},
+    H:  {k:"HOOK", img:"assets/symbols/hook.png",   t:Type.REG, w:8,  pay:{3:10,4:22,5:55}},
+    X:  {k:"BOX",  img:"assets/symbols/tackle.png", t:Type.REG, w:7,  pay:{3:12,4:28,5:70}},
+
+    // Specials
+    W:  {k:"WILD",    img:"assets/symbols/wild.png",    t:Type.WILD, w:6},
+    S:  {k:"SCATTER", img:"assets/symbols/scatter.png", t:Type.SCAT, w:4},
+
+    // Feature-only
+    $:  {k:"CASHFISH", img:"assets/symbols/cashfish.png",  t:Type.CASH, w:0},
+    C:  {k:"COLLECT",  img:"assets/symbols/collector.png", t:Type.COL,  w:0}
+  };
+
+  const REG_KEYS  = ["A","K","Q","J","T","R","B","H","X"];
+  const BASE_KEYS = [...REG_KEYS, "W", "S"];
+
+  // Awards
+  const FREE_AWARD = {3:10, 4:15, 5:20};
+  const RETRIG     = {3:5,  4:8,  5:12};
+
+  // Cash fish values (x bet)
+  const CASH_VALUES = [1,1,2,2,3,4,5,6,8,10,12,15,20,25,30,40,50];
+
+  // Free Spins Levels (1..4): higher level => more collectors
+  const LEVELS = [
+    {collector:0.05, cash:0.20, scatter:0.06, wild:0.08}, // L1
+    {collector:0.07, cash:0.22, scatter:0.06, wild:0.09}, // L2
+    {collector:0.10, cash:0.24, scatter:0.07, wild:0.10}, // L3
+    {collector:0.13, cash:0.26, scatter:0.07, wild:0.11}  // L4
+  ];
+
+  // UI
+  const reelsBox = document.getElementById("reelsBox");
+  const banner = document.getElementById("banner");
+  const bannerText = document.getElementById("bannerText");
+  const gridEl = document.getElementById("grid");
+
+  const balEl  = document.getElementById("bal");
+  const betEl  = document.getElementById("bet");
+  const lastEl = document.getElementById("last");
+  const modeEl = document.getElementById("mode");
+  const lvlEl  = document.getElementById("lvl");
+  const autoStatEl = document.getElementById("autoStat");
+  const msgEl  = document.getElementById("msg");
+
+  const spinBtn = document.getElementById("spin");
+  const betUpBtn = document.getElementById("betUp");
+  const betDownBtn = document.getElementById("betDown");
+  const maxBetBtn = document.getElementById("maxBet");
+  const muteBtn = document.getElementById("mute");
+
+  const autoBtn = document.getElementById("autoBtn");
+  const autoModal = document.getElementById("autoModal");
+  const closeAuto = document.getElementById("closeAuto");
+  const stopAutoNow = document.getElementById("stopAutoNow");
+  const stopOnFeature = document.getElementById("stopOnFeature");
+  const stopOnBig = document.getElementById("stopOnBig");
+  const stopOnZero = document.getElementById("stopOnZero");
+
+  // Big win overlay
+  const winOverlay = document.getElementById("winOverlay");
+  const winTitle = document.getElementById("winTitle");
+  const winAmount = document.getElementById("winAmount");
+  const winHint = document.getElementById("winHint");
+  const collectBtn = document.getElementById("collectBtn");
+
+  // Audio
+  let audioCtx = null;
+  let muted = false;
+  function ensureAudio(){
+    if (muted) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+  }
+  function beep({freq=440,dur=0.08,type="sine",vol=0.06,slideTo=null}={}){
+    if (muted) return;
+    ensureAudio(); if(!audioCtx) return;
+    const t0=audioCtx.currentTime;
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.type=type;
+    osc.frequency.setValueAtTime(freq,t0);
+    if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo,t0+dur);
+    gain.gain.setValueAtTime(0.0001,t0);
+    gain.gain.exponentialRampToValueAtTime(vol,t0+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  const sfx = {
+    spin: ()=>beep({freq:220,slideTo:360,dur:0.11,type:"triangle",vol:0.05}),
+    stop: ()=>beep({freq:420,dur:0.05,type:"sine",vol:0.03}),
+    tick: ()=>beep({freq:520,dur:0.03,type:"sine",vol:0.02}),
+    win:  ()=>beep({freq:660,slideTo:990,dur:0.10,type:"triangle",vol:0.07}),
+    big:  ()=>{beep({freq:880,slideTo:1320,dur:0.12,type:"sawtooth",vol:0.06}); setTimeout(()=>beep({freq:660,slideTo:990,dur:0.10,type:"triangle",vol:0.06}),85);},
+    free: ()=>beep({freq:740,slideTo:1200,dur:0.16,type:"triangle",vol:0.07}),
+    collect: ()=>beep({freq:520,slideTo:980,dur:0.14,type:"square",vol:0.06}),
+    lose: ()=>beep({freq:220,slideTo:160,dur:0.14,type:"sine",vol:0.05})
+  };
+
+  // Storage
+  const LS = "fishingsplash_all_v1";
+  const saved = JSON.parse(localStorage.getItem(LS) || "null");
+
+  let balance = saved?.balance ?? 10000;
+  let bet = saved?.bet ?? 100;
+  muted = saved?.muted ?? false;
+
+  let lastWin = 0;
+  let spinning = false;
+
+  // Feature
+  let freeSpins = 0;
+  let fsLevel = 0;       // 0 means none; 1..4 during FS
+  let featureTotal = 0;
+
+  // Auto-play
+  let autoLeft = 0;      // spins remaining
+  let autoEnabled = false;
+
+  // Each cell: {sym, cashMult}
+  let grid = makeGrid();
+
+  function save(){
+    localStorage.setItem(LS, JSON.stringify({
+      balance, bet, muted
+    }));
+  }
+  function fmt(n){ return Math.max(0, Math.floor(n)).toString(); }
+
+  function showBanner(text){
+    bannerText.textContent = text;
+    banner.classList.remove("hide");
+  }
+  function hideBanner(){
+    banner.classList.add("hide");
+  }
+
+  function setMsg(text){
+    msgEl.querySelector("span").innerHTML = text;
+  }
+
+  function renderTop(){
+    balEl.textContent = fmt(balance);
+    betEl.textContent = fmt(bet);
+    lastEl.textContent = fmt(lastWin);
+
+    if (freeSpins > 0){
+      modeEl.textContent = `Free Spins (${freeSpins})`;
+      lvlEl.textContent = `L${fsLevel || 1}`;
+    } else {
+      modeEl.textContent = "Base";
+      lvlEl.textContent = "-";
+    }
+
+    autoStatEl.textContent = autoEnabled ? `${autoLeft}` : "Off";
+
+    const cost = freeSpins > 0 ? 0 : bet;
+    spinBtn.disabled = spinning || balance < cost || winOverlay.classList.contains("show");
+
+    betUpBtn.disabled = spinning;
+    betDownBtn.disabled = spinning;
+    maxBetBtn.disabled = spinning;
+  }
+
+  function makeGrid(){
+    return Array.from({length:ROWS}, ()=>Array.from({length:REELS}, ()=>({sym:SYM.A, cashMult:0})));
+  }
+
+  function drawGrid(){
+    gridEl.innerHTML = "";
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        const cell = document.createElement("div");
+        cell.className = "cell";
+
+        const img = document.createElement("img");
+        img.className = "sym";
+        img.alt = grid[r][c].sym.k;
+        img.src = grid[r][c].sym.img;
+
+        const s = grid[r][c].sym;
+
+        const tag = document.createElement("div");
+        tag.className = "tag";
+        if (s.t === Type.WILD) tag.textContent = "WILD";
+        if (s.t === Type.SCAT) tag.textContent = "SCAT";
+        if (s.t === Type.CASH) tag.textContent = "CASH";
+        if (s.t === Type.COL)  tag.textContent = "COLLECT";
+        if (tag.textContent) tag.style.display = "block";
+
+        const cash = document.createElement("div");
+        cash.className = "cash";
+        if (s.t === Type.CASH){
+          cash.style.display = "block";
+          cash.textContent = "x" + grid[r][c].cashMult;
+        }
+
+        cell.appendChild(img);
+        cell.appendChild(tag);
+        cell.appendChild(cash);
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function clearHighlights(){
+    [...gridEl.children].forEach(el => el.classList.remove("winGlow","featureGlow","bounce"));
+  }
+
+  function highlight(pred, className){
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if (pred(grid[r][c], r, c)){
+          const idx = r*REELS + c;
+          gridEl.children[idx]?.classList.add(className);
+        }
+      }
+    }
+  }
+
+  // Weighted pick for base symbols
+  const baseBag = (() => {
+    const bag = [];
+    for (const key of BASE_KEYS){
+      const w = SYM[key].w || 1;
+      for (let i=0;i<w;i++) bag.push(SYM[key]);
+    }
+    return bag;
+  })();
+
+  function pickBase(){ return baseBag[(Math.random()*baseBag.length)|0]; }
+  function pickCashMult(){ return CASH_VALUES[(Math.random()*CASH_VALUES.length)|0]; }
+
+  function fsChances(){
+    const idx = Math.max(1, Math.min(4, fsLevel || 1)) - 1;
+    return LEVELS[idx];
+  }
+
+  function rollCell(){
+    if (freeSpins > 0){
+      const ch = fsChances();
+      const roll = Math.random();
+
+      // Order matters:
+      if (roll < ch.collector) return {sym: SYM.C, cashMult:0};
+      if (roll < ch.collector + ch.cash) return {sym: SYM.$, cashMult: pickCashMult()};
+      if (roll < ch.collector + ch.cash + ch.scatter) return {sym: SYM.S, cashMult:0};
+      if (roll < ch.collector + ch.cash + ch.scatter + ch.wild) return {sym: SYM.W, cashMult:0};
+
+      const rk = REG_KEYS[(Math.random()*REG_KEYS.length)|0];
+      return {sym: SYM[rk], cashMult:0};
+    }
+    return {sym: pickBase(), cashMult:0};
+  }
+
+  function countType(t){
+    let n=0;
+    for(let r=0;r<ROWS;r++) for(let c=0;c<REELS;c++) if(grid[r][c].sym.t===t) n++;
+    return n;
+  }
+
+  function evalWays(){
+    const wins = [];
+    for(const key of REG_KEYS){
+      const target = SYM[key];
+      const counts = [];
+      for(let c=0;c<REELS;c++){
+        let count = 0;
+        for(let r=0;r<ROWS;r++){
+          const s = grid[r][c].sym;
+          if (s === target || s.t === Type.WILD) count++;
+        }
+        counts.push(count);
+        if (count === 0) break;
+      }
+      let len = 0;
+      for(let i=0;i<counts.length;i++){ if(counts[i]>0) len++; else break; }
+      if (len >= 3){
+        const ways = counts.slice(0,len).reduce((a,b)=>a*b,1);
+        const pay = target.pay[len] || 0;
+        const amount = ways * pay * bet;
+        if (amount>0) wins.push({key, amount});
+      }
+    }
+    wins.sort((a,b)=>b.amount-a.amount);
+    return wins;
+  }
+
+  function collectFish(){
+    const collectors = countType(Type.COL);
+    if (collectors <= 0) return 0;
+
+    let fishTotal = 0;
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if (grid[r][c].sym.t === Type.CASH){
+          fishTotal += grid[r][c].cashMult * bet;
+        }
+      }
+    }
+    if (fishTotal <= 0) return 0;
+
+    const collected = fishTotal * collectors;
+
+    // clear cash fish after collecting
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if (grid[r][c].sym.t === Type.CASH){
+          const rk = REG_KEYS[(Math.random()*REG_KEYS.length)|0];
+          grid[r][c] = {sym: SYM[rk], cashMult:0};
+        }
+      }
+    }
+    drawGrid();
+
+    clearHighlights();
+    highlight(cell => cell.sym.t===Type.COL, "featureGlow");
+    sfx.collect();
+
+    // Level up once per spin if any collector landed (caps at 4)
+    if (freeSpins > 0){
+      fsLevel = Math.min(4, (fsLevel || 1) + 1);
+    }
+
+    return collected;
+  }
+
+  // Reel animations
+  function animateReel(reelIndex, finalCol, durationMs){
+    return new Promise(resolve=>{
+      const start = performance.now();
+      let lastSwap = 0;
+
+      function step(t){
+        if (t - start >= durationMs){
+          for(let r=0;r<ROWS;r++) grid[r][reelIndex] = finalCol[r];
+          drawGrid();
+          sfx.stop();
+
+          // Bounce the reel cells that just stopped
+          for(let r=0;r<ROWS;r++){
+            const idx = r*REELS + reelIndex;
+            const el = gridEl.children[idx];
+            if (el){
+              el.classList.remove("bounce");
+              // Force reflow so animation restarts
+              void el.offsetWidth;
+              el.classList.add("bounce");
+            }
+          }
+
+          resolve();
+          return;
+        }
+
+        if (t - lastSwap > 55){
+          for(let r=0;r<ROWS;r++) grid[r][reelIndex] = {sym: pickBase(), cashMult:0};
+          drawGrid();
+          if (Math.random()<0.35) sfx.tick();
+          lastSwap = t;
+        }
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function spinReels({fast=false}={}){
+    reelsBox.classList.add("spinning");
+    const finals = Array.from({length:REELS}, ()=>Array.from({length:ROWS}, ()=>rollCell()));
+    const base = fast ? 260 : 560;
+    const stagger = fast ? 80 : 140;
+    sfx.spin();
+
+    await Promise.all(
+      Array.from({length:REELS}, (_,i)=>animateReel(i, finals[i], base + stagger*i))
+    );
+
+    reelsBox.classList.remove("spinning");
+  }
+
+  // Big win overlay helpers
+  function showWinOverlay(kind, amount){
+    winTitle.classList.remove("big","mega","super");
+    winTitle.textContent = kind;
+    if (kind.includes("SUPER")) winTitle.classList.add("super");
+    else if (kind.includes("MEGA")) winTitle.classList.add("mega");
+    else winTitle.classList.add("big");
+
+    winAmount.textContent = fmt(amount);
+    winHint.textContent = "Tap COLLECT to continue";
+    winOverlay.classList.add("show");
+    renderTop();
+  }
+  function hideWinOverlay(){
+    winOverlay.classList.remove("show");
+    renderTop();
+  }
+
+  async function rollupTo(el, amount){
+    const start = performance.now();
+    const dur = Math.min(1300, 320 + Math.log10(amount+1)*520);
+    return new Promise(resolve=>{
+      function step(t){
+        const p = Math.min(1, (t-start)/dur);
+        const eased = 1 - Math.pow(1-p, 3);
+        el.textContent = fmt(amount*eased);
+        if (p<1) requestAnimationFrame(step);
+        else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  function autoStopAll(){
+    autoEnabled = false;
+    autoLeft = 0;
+    renderTop();
+  }
+
+  function openAuto(){
+    autoModal.classList.add("show");
+    autoModal.setAttribute("aria-hidden","false");
+  }
+  function closeAutoModal(){
+    autoModal.classList.remove("show");
+    autoModal.setAttribute("aria-hidden","true");
+  }
+
+  // Main spin
+  async function spinOnce({fast=false}={}){
+    if (spinning) return;
+    if (winOverlay.classList.contains("show")) return;
+
+    ensureAudio();
+    spinning = true;
+
+    clearHighlights();
+    lastWin = 0;
+    renderTop();
+
+    // Banner logic
+    hideBanner();
+
+    const isFree = freeSpins > 0;
+    const cost = isFree ? 0 : bet;
+
+    if (balance < cost){
+      setMsg("Not enough balance.");
+      sfx.lose();
+      spinning = false;
+      if (autoEnabled && stopOnZero.checked) autoStopAll();
+      showBanner("PLACE YOUR BETS!");
+      renderTop();
+      return;
+    }
+
+    // Deduct
+    if (!isFree) balance -= bet;
+    else freeSpins -= 1;
+
+    renderTop();
+    await spinReels({fast});
+
+    let total = 0;
+
+    // Ways wins
+    const wins = evalWays();
+    if (wins.length){
+      total += wins.reduce((s,w)=>s+w.amount,0);
+      const top = wins[0].key;
+      highlight(cell => cell.sym === SYM[top] || cell.sym.t===Type.WILD, "winGlow");
+    }
+
+    // Scatters
+    const scat = countType(Type.SCAT);
+    if (scat >= 3){
+      highlight(cell => cell.sym.t===Type.SCAT, "featureGlow");
+      const add = isFree ? (RETRIG[scat]||0) : (FREE_AWARD[scat]||0);
+      if (add){
+        if (!isFree){
+          // start free spins levels at 1
+          fsLevel = 1;
+          featureTotal = 0;
+        }
+        freeSpins += add;
+        setMsg(`SCATTER! +<strong>${add}</strong> Free Spins`);
+        sfx.free();
+
+        // Auto: stop on feature (if configured)
+        if (autoEnabled && stopOnFeature.checked && !isFree){
+          autoStopAll();
+        }
+      }
+    }
+
+    // Collectors in FS
+    if (isFree){
+      const collected = collectFish();
+      if (collected > 0){
+        total += collected;
+        setMsg(`COLLECTOR! Collected <strong>${fmt(collected)}</strong> • Level now <strong>L${fsLevel}</strong>`);
+      }
+    }
+
+    // Payout
+    if (total > 0){
+      balance += total;
+      lastWin = total;
+      if (isFree) featureTotal += total;
+
+      const x = total / bet;
+
+      // Decide big/mega/super thresholds
+      const kind = (x >= 100) ? "SUPER WIN"
+                 : (x >= 50)  ? "MEGA WIN"
+                 : (x >= 20)  ? "BIG WIN"
+                 : "";
+
+      if (kind){
+        // Stop auto on big win if configured
+        if (autoEnabled && stopOnBig.checked) autoStopAll();
+
+        // Show overlay with rollup inside
+        (x >= 50 ? sfx.big : sfx.win)();
+        showWinOverlay(kind, total);
+        winAmount.textContent = "0";
+        await rollupTo(winAmount, total);
+      } else {
+        (x >= 60 ? sfx.big : sfx.win)();
+        await rollupTo(lastEl, total);
+        setMsg(isFree
+          ? `WIN <strong>${fmt(total)}</strong> • FS left <strong>${freeSpins}</strong> • L<strong>${fsLevel}</strong>`
+          : `WIN <strong>${fmt(total)}</strong>`);
+      }
+    } else {
+      sfx.lose();
+      setMsg(isFree
+        ? `No win • FS left <strong>${freeSpins}</strong> • L<strong>${fsLevel}</strong>`
+        : "No win.");
+    }
+
+    // End feature
+    if (isFree && freeSpins === 0){
+      setMsg(`Free Spins complete. Feature total: <strong>${fmt(featureTotal)}</strong>`);
+      fsLevel = 0;
+      featureTotal = 0;
+    }
+
+    spinning = false;
+    save();
+    renderTop();
+
+    // Banner back on when idle
+    if (freeSpins === 0 && !spinning && !autoEnabled && !winOverlay.classList.contains("show")){
+      showBanner("PLACE YOUR BETS!");
+    } else if (freeSpins > 0){
+      showBanner(`FREE SPINS! LEVEL L${fsLevel || 1}`);
+    }
+
+    // Auto-play loop
+    if (autoEnabled && !winOverlay.classList.contains("show")){
+      if (autoLeft > 0){
+        autoLeft -= 1;
+        renderTop();
+        // If feature started and stopOnFeature is on, autoStopAll() already happened above.
+        if (autoEnabled){
+          await new Promise(r=>setTimeout(r, fast ? 80 : 220));
+          spinOnce({fast:true});
+        }
+      } else {
+        autoStopAll();
+        showBanner("PLACE YOUR BETS!");
+      }
+    }
+  }
+
+  function setBet(n){
+    bet = Math.max(50, Math.min(n, 500));
+    save();
+    renderTop();
+  }
+
+  // Controls
+  spinBtn.addEventListener("click", ()=>spinOnce());
+  betUpBtn.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(bet+50); });
+  betDownBtn.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(bet-50); });
+  maxBetBtn.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(500); });
+
+  muteBtn.addEventListener("click", ()=>{
+    ensureAudio();
+    muted = !muted;
+    save();
+    renderTop();
+  });
+
+  // Auto panel open/close
+  autoBtn.addEventListener("click", ()=>{
+    ensureAudio();
+    openAuto();
+  });
+  closeAuto.addEventListener("click", closeAutoModal);
+  autoModal.addEventListener("click", (e)=>{
+    if (e.target === autoModal) closeAutoModal();
+  });
+
+  // Start auto from buttons
+  autoModal.querySelectorAll("[data-autospins]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      ensureAudio();
+      const n = parseInt(btn.getAttribute("data-autospins"), 10);
+      autoEnabled = true;
+      autoLeft = n;
+      closeAutoModal();
+      renderTop();
+      // Kick off immediately
+      if (!spinning && !winOverlay.classList.contains("show")){
+        spinOnce({fast:true});
+      }
+    });
+  });
+
+  // Stop auto
+  stopAutoNow.addEventListener("click", ()=>{
+    autoStopAll();
+    closeAutoModal();
+    if (freeSpins === 0) showBanner("PLACE YOUR BETS!");
+  });
+
+  // Big win collect
+  collectBtn.addEventListener("click", ()=>{
+    hideWinOverlay();
+    if (freeSpins > 0) showBanner(`FREE SPINS! LEVEL L${fsLevel || 1}`);
+    else if (!autoEnabled) showBanner("PLACE YOUR BETS!");
+    // if auto is enabled, it will continue on next loop
+    if (autoEnabled && !spinning){
+      setTimeout(()=>spinOnce({fast:true}), 180);
+    }
+  });
+
+  // Unlock audio on first interaction
+  document.addEventListener("pointerdown", ()=>ensureAudio(), {once:true});
+
+  // Hold to fast spin (mobile)
+  let holding=false, holdTimer=null;
+  spinBtn.addEventListener("pointerdown",(e)=>{
+    if (e.pointerType==="mouse") return;
+    holding=true;
+    holdTimer=setTimeout(()=>{ if(holding && !spinning) spinOnce({fast:true}); }, 220);
+  });
+  const endHold=()=>{ holding=false; if(holdTimer) clearTimeout(holdTimer); holdTimer=null; };
+  spinBtn.addEventListener("pointerup", endHold);
+  spinBtn.addEventListener("pointercancel", endHold);
+  spinBtn.addEventListener("pointerleave", endHold);
+
+  // Init
+  grid = makeGrid();
+  for(let c=0;c<REELS;c++){
+    for(let r=0;r<ROWS;r++){
+      grid[r][c] = {sym: pickBase(), cashMult:0};
+    }
+  }
+  drawGrid();
+  setMsg("Ready. Get 3+ Scatter for Free Spins. In Free Spins, Collector collects Cash Fish values.");
+  renderTop();
+  save();
+  showBanner("PLACE YOUR BETS!");
+})();
+</script>
+</body>
+</html>
