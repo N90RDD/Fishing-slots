@@ -335,3 +335,331 @@
   </div>
 
   <!-- SCRIPT will be Chunk 3 + 4 -->
+<script>
+/* ================== BASIC SETUP (Chunk 3) ================== */
+"use strict";
+
+/* DOM */
+const grid = document.getElementById("grid");
+const msg = document.getElementById("msg");
+const banner = document.getElementById("banner");
+const balEl = document.getElementById("bal");
+const betEl = document.getElementById("bet");
+const lastEl = document.getElementById("last");
+const modeTxt = document.getElementById("modeTxt");
+const modePill = document.getElementById("modePill");
+
+const barWin = document.getElementById("barWin");
+const barInfo = document.getElementById("barInfo");
+
+const spinBtn = document.getElementById("spinBtn");
+const betDownBtn = document.getElementById("betDown");
+const betUpBtn = document.getElementById("betUp");
+const maxBetBtn = document.getElementById("maxBet");
+const soundBtn = document.getElementById("soundBtn");
+const autoBtn = document.getElementById("autoBtn");
+
+const bonusOverlay = document.getElementById("bonusOverlay");
+const bonusStartBtn = document.getElementById("bonusStartBtn");
+const bonusText = document.getElementById("bonusText");
+
+const winOverlay = document.getElementById("winOverlay");
+const winTitle = document.getElementById("winTitle");
+const winAmountEl = document.getElementById("winAmount");
+const winOkBtn = document.getElementById("winOkBtn");
+
+/* CONFIG */
+const COLS = 5, ROWS = 3;
+
+/* reel timing (tweak later) */
+const REEL_START_SPIN_MS = 320;  // when spin starts visually
+const REEL_GAP_MS        = 170;  // stagger between reel stops
+const SYMBOL_CYCLE_MS    = 70;   // how fast symbols "cycle" while spinning
+
+/* symbols (these must match your filenames in assets/symbols/) */
+const symbolsBase = [
+  "A","K","Q","J","10",
+  "rod","boat","tackle","hook",
+  "wild","scatter","cashfish"
+];
+const symbolsFS = [
+  "A","K","Q","J","10",
+  "rod","boat","tackle","hook",
+  "wild","scatter","cashfish","collector"
+];
+
+/* STATE */
+let balance = 10000;     // displayed as £
+let bet = 1.00;          // £
+let lastWin = 0;
+let mode = "Base";       // "Base" | "FreeSpins"
+let spinning = false;
+
+let auto = false;
+let soundOn = true;
+
+/* Free spins state (logic in Chunk 4) */
+let freeSpinsLeft = 0;
+let bonusMultiplier = 1;
+
+/* Per-spin context (Chunk 4 will use) */
+let spinCtx = {};
+
+/* ================== AUDIO ================== */
+const audio = {
+  bg: new Audio("assets/audio/bg.mp3"),
+  spin: new Audio("assets/audio/spin.mp3"),
+  bonus: new Audio("assets/audio/bonus.mp3"),
+};
+audio.bg.loop = true;
+audio.bonus.loop = true;
+audio.bg.volume = 0.45;
+audio.bonus.volume = 0.45;
+audio.spin.volume = 0.65;
+
+let audioUnlocked = false;
+
+function safePlay(a){
+  if(!soundOn) return;
+  try{
+    a.currentTime = 0;
+    const p = a.play();
+    if(p && typeof p.catch === "function") p.catch(()=>{});
+  }catch(e){}
+}
+
+function safeLoopStart(a){
+  if(!soundOn) return;
+  try{
+    const p = a.play();
+    if(p && typeof p.catch === "function") p.catch(()=>{});
+  }catch(e){}
+}
+
+function stopAudio(a){
+  try{ a.pause(); a.currentTime = 0; }catch(e){}
+}
+
+function unlockAudioOnce(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+  // quick silent-ish play/pause to unlock on mobile
+  try{
+    audio.spin.volume = 0;
+    audio.spin.play().then(()=>{
+      audio.spin.pause();
+      audio.spin.currentTime = 0;
+      audio.spin.volume = 0.65;
+      safeLoopStart(audio.bg);
+    }).catch(()=>{ audio.spin.volume = 0.65; });
+  }catch(e){}
+}
+
+/* ================== HELPERS ================== */
+function fmtMoney(n){
+  // keep simple £ with 2dp
+  return Number(n).toFixed(2);
+}
+function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+function randFrom(arr){ return arr[(Math.random()*arr.length)|0]; }
+
+function setDisabled(v){
+  spinBtn.disabled = v;
+  betDownBtn.disabled = v;
+  betUpBtn.disabled = v;
+  maxBetBtn.disabled = v;
+  autoBtn.disabled = v;
+}
+
+function updateUI(){
+  balEl.textContent = fmtMoney(balance);
+  betEl.textContent = fmtMoney(bet);
+  lastEl.textContent = fmtMoney(lastWin);
+  modeTxt.textContent = (mode==="FreeSpins") ? "Free Spins" : "Base";
+  barWin.textContent = "£" + fmtMoney(0);
+}
+
+/* ================== GRID BUILD ================== */
+function makeCell(){
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  const img = document.createElement("img");
+  img.alt = "symbol";
+  img.draggable = false;
+  cell.appendChild(img);
+  return cell;
+}
+
+function setCellSymbol(cell, sym){
+  const img = cell.querySelector("img");
+  img.src = `assets/symbols/${sym}.png`;
+  img.alt = sym;
+}
+
+function createGrid(){
+  grid.innerHTML = "";
+  for(let i=0;i<COLS*ROWS;i++){
+    const cell = makeCell();
+    setCellSymbol(cell, randFrom(symbolsBase));
+    grid.appendChild(cell);
+  }
+}
+
+/* ================== REEL SPIN ENGINE ================== */
+const reelTimers = new Array(COLS).fill(null);
+
+function startReelCycle(col){
+  stopReelCycle(col);
+  reelTimers[col] = setInterval(()=>{
+    for(let row=0; row<ROWS; row++){
+      const idx = row*COLS + col;
+      const cell = grid.children[idx];
+      cell.classList.add("spinning");
+      setCellSymbol(cell, randFrom(mode==="FreeSpins" ? symbolsFS : symbolsBase));
+    }
+  }, SYMBOL_CYCLE_MS);
+}
+
+function stopReelCycle(col){
+  if(reelTimers[col]){
+    clearInterval(reelTimers[col]);
+    reelTimers[col] = null;
+  }
+}
+
+/* stop visuals but final symbols + payouts handled in Chunk 4 */
+function stopReelVisual(col){
+  stopReelCycle(col);
+  for(let row=0; row<ROWS; row++){
+    const idx = row*COLS + col;
+    const cell = grid.children[idx];
+    cell.classList.remove("spinning");
+    cell.classList.add("stop");
+    setTimeout(()=>cell.classList.remove("stop"), 220);
+  }
+}
+
+/* ================== BUTTONS ================== */
+betDownBtn.addEventListener("click", ()=>{
+  bet = clamp(bet - 0.50, 0.50, 50);
+  updateUI();
+});
+betUpBtn.addEventListener("click", ()=>{
+  bet = clamp(bet + 0.50, 0.50, 50);
+  updateUI();
+});
+maxBetBtn.addEventListener("click", ()=>{
+  bet = 10.00;
+  updateUI();
+});
+
+soundBtn.addEventListener("click", ()=>{
+  soundOn = !soundOn;
+  soundBtn.textContent = soundOn ? "SOUND: ON" : "SOUND: OFF";
+  if(!soundOn){
+    stopAudio(audio.bg);
+    stopAudio(audio.bonus);
+  }else{
+    safeLoopStart(mode==="FreeSpins" ? audio.bonus : audio.bg);
+  }
+});
+
+autoBtn.addEventListener("click", ()=>{
+  auto = !auto;
+  autoBtn.textContent = auto ? "AUTO: ON" : "AUTO: OFF";
+  if(auto && !spinning){
+    spin();
+  }
+});
+
+winOkBtn.addEventListener("click", ()=>{ winOverlay.style.display="none"; });
+winOverlay.addEventListener("click", (e)=>{ if(e.target===winOverlay) winOverlay.style.display="none"; });
+
+bonusStartBtn.addEventListener("click", ()=>{
+  bonusOverlay.style.display="none";
+  // Chunk 4 will actually start Free Spins properly
+  // For now just allow spin
+  setTimeout(()=>spin(), 250);
+});
+
+/* unlock audio on first touch/click anywhere */
+window.addEventListener("pointerdown", unlockAudioOnce, { once:true });
+
+/* ================== SPIN ================== */
+spinBtn.addEventListener("click", ()=>{
+  unlockAudioOnce();
+  spin();
+});
+
+function spin(){
+  if(spinning) return;
+
+  // simple guards
+  if(mode==="Base" && balance < bet){
+    msg.textContent = "Not enough balance.";
+    return;
+  }
+
+  spinning = true;
+  setDisabled(true);
+
+  // build a per-spin context for Chunk 4
+  spinCtx = {
+    startedAt: Date.now(),
+    spawnCollector: false,
+    hasCollector: false
+  };
+
+  if(mode==="Base"){
+    balance = +(balance - bet).toFixed(2);
+  }else{
+    // Free spins: Chunk 4 will manage decrementing freeSpinsLeft
+  }
+
+  barInfo.textContent = (mode==="FreeSpins") ? `FREE SPINS` : "SPINNING";
+  barWin.textContent = "£0";
+  msg.textContent = "Spinning...";
+  updateUI();
+
+  // start reels cycling
+  setTimeout(()=>{
+    for(let c=0;c<COLS;c++) startReelCycle(c);
+    safePlay(audio.spin);
+  }, REEL_START_SPIN_MS);
+
+  // stop reels staggered
+  for(let c=0;c<COLS;c++){
+    setTimeout(()=>{
+      stopReelVisual(c);
+
+      // last reel -> resolve
+      if(c === COLS-1){
+        setTimeout(()=>{
+          // Chunk 4 will stop all reels, set final symbols, then resolve payouts.
+          if(typeof resolveSpin === "function"){
+            resolveSpin();
+          }else{
+            // fallback so page never gets stuck
+            msg.textContent = "Missing Chunk 4 (resolveSpin).";
+            spinning = false;
+            setDisabled(false);
+          }
+        }, 120);
+      }
+    }, REEL_START_SPIN_MS + 200 + c*REEL_GAP_MS);
+  }
+}
+
+/* ================== INIT ================== */
+createGrid();
+updateUI();
+
+/* Chunk 4 will continue from here:
+   - final reel symbols on stop
+   - win evaluation, win count-up
+   - big/mega win overlay
+   - bonus trigger (3 scatters)
+   - free spins, collector ladder, cashfish collect
+   - end bonus + music switch
+*/
+</script>
