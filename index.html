@@ -662,4 +662,465 @@ updateUI();
    - free spins, collector ladder, cashfish collect
    - end bonus + music switch
 */
+/* ================== CHUNK 4 ==================
+   Fixes + Features:
+   ✅ Final symbols land on stop (no "changing after stop")
+   ✅ Store symbol in dataset for counting
+   ✅ Adds value badges (CSS injected) for cashfish in Free Spins
+   ✅ Base = Cluster Pays (5+ touching, wild counts)
+   ✅ 3+ Scatters triggers Bonus Intro
+   ✅ Scatter tease respin (2 scatters in reels 1–4, rows 1–2) once
+   ✅ Free spins 10 auto-spins, cashfish collect ONLY if collector present
+   ✅ Collector ladder tracking (logic) + banner updates
+   ✅ Big Win / Mega Win overlay
+   ✅ Music swap base ↔ bonus
+*/
+
+/* --- inject missing CSS for value badge (in case you don't have it) --- */
+(function injectBadgeCSS(){
+  const css = `
+    .valueBadge{
+      position:absolute;
+      bottom:7px;
+      left:50%;
+      transform:translateX(-50%);
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:900;
+      background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.12);
+      display:none;
+      white-space:nowrap;
+      pointer-events:none;
+    }
+  `;
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+/* --- override setCellSymbol to store sym + handle badge --- */
+function setCellSymbol(cell, sym){
+  const img = cell.querySelector("img");
+  img.src = `assets/symbols/${sym}.png?v=${Math.random()}`;
+  img.alt = sym;
+  cell.dataset.sym = sym;
+
+  // ensure badge exists
+  let badge = cell.querySelector(".valueBadge");
+  if(!badge){
+    badge = document.createElement("div");
+    badge.className = "valueBadge";
+    cell.appendChild(badge);
+  }
+
+  // reset badge
+  badge.style.display = "none";
+  cell.dataset.val = "";
+
+  // show cashfish values ONLY in free spins
+  if(mode==="FreeSpins" && sym==="cashfish"){
+    const mult = randFrom([0.05,0.08,0.10,0.12,0.15,0.20,0.25,0.30,0.40,0.50]);
+    const value = Math.max(1, Math.round(mult * bet));
+    cell.dataset.val = String(value);
+    badge.textContent = "£" + fmtMoney(value);
+    badge.style.display = "block";
+  }
+}
+
+/* --- rebuild grid so every cell has dataset + badge --- */
+function createGrid(){
+  grid.innerHTML = "";
+  for(let i=0;i<COLS*ROWS;i++){
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const img = document.createElement("img");
+    img.alt = "symbol";
+    img.draggable = false;
+    cell.appendChild(img);
+    const badge = document.createElement("div");
+    badge.className = "valueBadge";
+    cell.appendChild(badge);
+
+    // base start symbol (no cashfish/collector)
+    const startPool = ["A","K","Q","J","10","rod","boat","tackle","hook","wild","scatter"];
+    setCellSymbol(cell, randFrom(startPool));
+
+    grid.appendChild(cell);
+  }
+}
+
+/* --- helpers for counting / grid access --- */
+function symAt(r,c){
+  const cell = grid.children[r*COLS + c];
+  return cell ? (cell.dataset.sym || "") : "";
+}
+function countSymbol(sym){
+  let n=0;
+  for(const cell of grid.children){
+    if(cell.dataset.sym === sym) n++;
+  }
+  return n;
+}
+
+/* ================== CLUSTER PAYS (BASE) ==================
+   5+ touching (up/down/left/right)
+   wild counts as matching any paying symbol
+*/
+const CLUSTER_PAYS = {
+  A:  [0,0,0,0,0.15,0.30,0.45,0.70,1.00,1.30],
+  K:  [0,0,0,0,0.20,0.40,0.60,1.00,1.40,2.00],
+  Q:  [0,0,0,0,0.25,0.50,0.80,1.20,1.80,2.60],
+  J:  [0,0,0,0,0.30,0.60,1.00,1.50,2.20,3.20],
+  "10":[0,0,0,0,0.35,0.70,1.20,1.80,2.60,3.80],
+  rod:    [0,0,0,0,0.80,1.60,2.60,4.00,6.00,9.00],
+  boat:   [0,0,0,0,1.00,2.00,3.50,5.50,8.00,12.0],
+  tackle: [0,0,0,0,1.20,2.50,4.50,7.00,10.0,15.0],
+  hook:   [0,0,0,0,1.40,3.00,5.50,8.50,12.0,18.0]
+};
+
+function inBounds(r,c){ return r>=0 && r<ROWS && c>=0 && c<COLS; }
+function key(r,c){ return r+"-"+c; }
+
+function getClusters(){
+  const visited = new Set();
+  const clusters = [];
+
+  function isPayable(s){
+    return !(s==="scatter" || s==="cashfish" || s==="collector");
+  }
+
+  function matches(target, s){
+    if(!isPayable(s)) return false;
+    return s===target || s==="wild";
+  }
+
+  function dfs(target, r, c, acc){
+    const k = key(r,c);
+    if(visited.has(k)) return;
+    const s = symAt(r,c);
+    if(!matches(target, s)) return;
+
+    visited.add(k);
+    acc.push({r,c});
+
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for(const [dr,dc] of dirs){
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc)) dfs(target,nr,nc,acc);
+    }
+  }
+
+  for(const target of Object.keys(CLUSTER_PAYS)){
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const s = symAt(r,c);
+        if(!matches(target,s)) continue;
+
+        const k=key(r,c);
+        if(visited.has(k)) continue;
+
+        const acc=[];
+        dfs(target,r,c,acc);
+
+        if(acc.length>=5){
+          clusters.push({sym:target, cells:acc});
+        }else{
+          // allow reuse if too small
+          acc.forEach(p=>visited.delete(key(p.r,p.c)));
+        }
+      }
+    }
+  }
+
+  return clusters;
+}
+
+function evaluateClustersWin(){
+  const clusters = getClusters();
+  let total = 0;
+
+  for(const cl of clusters){
+    const payRow = CLUSTER_PAYS[cl.sym];
+    if(!payRow) continue;
+    const size = Math.min(cl.cells.length, payRow.length-1);
+    const betUnits = payRow[size] || 0;
+    total += Math.round(betUnits * bet);
+  }
+  return total;
+}
+
+/* ================== TEASE RESPIN ==================
+   Exactly 2 scatters AND both are in:
+   - reels 1–4 (col 0..3)
+   - rows 1–2 (row 0..1)
+*/
+function teaseConditionMet(){
+  const scat=[];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(symAt(r,c)==="scatter") scat.push({r,c});
+    }
+  }
+  if(scat.length!==2) return false;
+  return scat.every(p => p.c<=3 && p.r<=1);
+}
+
+/* ================== BIG / MEGA WIN ================== */
+function maybeBigWinOverlay(amount){
+  const x = amount / bet;
+  if(x >= 50){
+    winTitle.textContent = "MEGA WIN!";
+    winAmountEl.textContent = fmtMoney(amount);
+    winOverlay.style.display = "flex";
+  }else if(x >= 20){
+    winTitle.textContent = "BIG WIN!";
+    winAmountEl.textContent = fmtMoney(amount);
+    winOverlay.style.display = "flex";
+  }
+}
+
+/* ================== WIN COUNT-UP ================== */
+let winRAF=null;
+function animateWinTo(target){
+  if(winRAF) cancelAnimationFrame(winRAF);
+
+  const start = Number((barWin.textContent||"£0").replace("£","")) || 0;
+  const t0 = performance.now();
+  const DUR = 650;
+
+  function frame(t){
+    const p = Math.min(1,(t-t0)/DUR);
+    const eased = 1 - Math.pow(1-p,3);
+    const v = start + (target-start)*eased;
+    barWin.textContent = "£" + fmtMoney(v);
+    if(p<1) winRAF=requestAnimationFrame(frame);
+  }
+  winRAF=requestAnimationFrame(frame);
+}
+
+/* ================== BONUS FLOW ================== */
+function enterBonus(){
+  mode = "FreeSpins";
+  freeSpinsLeft = 10;
+  bonusMultiplier = 1;
+  bonusCollectorCount = 0;
+
+  // music swap
+  stopAudio(audio.bg);
+  safeLoopStart(audio.bonus);
+
+  banner.textContent = "FREE SPINS!";
+  msg.textContent = "Bonus started!";
+  updateUI();
+}
+
+function exitBonus(){
+  mode = "Base";
+  freeSpinsLeft = 0;
+  bonusMultiplier = 1;
+
+  stopAudio(audio.bonus);
+  safeLoopStart(audio.bg);
+
+  banner.textContent = "PLACE YOUR BETS!";
+  msg.textContent = "Back to Base.";
+  updateUI();
+}
+
+/* ================== FREE SPINS: COLLECT ================== */
+let bonusCollectorCount = 0;
+
+function collectCashfishIfCollectorPresent(){
+  const collectors = countSymbol("collector");
+  if(collectors<=0) return 0;
+
+  let sum = 0;
+  for(const cell of grid.children){
+    if(cell.dataset.sym==="cashfish"){
+      sum += Number(cell.dataset.val||0);
+    }
+  }
+  if(sum<=0) return 0;
+  return Math.round(sum * bonusMultiplier);
+}
+
+function applyCollectorProgress(){
+  const collectorsThisSpin = countSymbol("collector");
+  if(collectorsThisSpin<=0) return;
+
+  bonusCollectorCount += collectorsThisSpin;
+
+  if(bonusCollectorCount >= 8){
+    bonusMultiplier = 3;
+  }else if(bonusCollectorCount >= 4){
+    bonusMultiplier = 2;
+  }
+}
+
+/* ================== FINAL SYMBOL LANDING ==================
+   This is the part that makes reels "land" properly.
+*/
+function pickFinalSymbol(row, col){
+  if(mode==="FreeSpins"){
+    // only allow ONE collector per spin, and only on reel 5 (col 4)
+    if(!spinCtx.hasCollector && col===4 && Math.random() < 0.10){
+      spinCtx.hasCollector = true;
+      return "collector";
+    }
+    // normal FS pool
+    return randFrom(["A","K","Q","J","10","rod","boat","tackle","hook","wild","scatter","cashfish","cashfish","cashfish"]);
+  }
+
+  // BASE pool (NO cashfish/collector)
+  return randFrom(["A","K","Q","J","10","rod","boat","tackle","hook","wild","scatter"]);
+}
+
+/* Override stopReelVisual so it also SETS final symbols (important) */
+function stopReelVisual(col){
+  stopReelCycle(col);
+
+  for(let row=0; row<ROWS; row++){
+    const idx = row*COLS + col;
+    const cell = grid.children[idx];
+
+    // land final symbol here
+    const sym = pickFinalSymbol(row, col);
+    setCellSymbol(cell, sym);
+
+    cell.classList.remove("spinning");
+    cell.classList.add("stop");
+    setTimeout(()=>cell.classList.remove("stop"), 220);
+  }
+}
+
+/* ================== RESOLVE SPIN ================== */
+function resolveSpin(){
+  stopAudio(audio.spin);
+
+  const scatters = countSymbol("scatter");
+
+  // FREE SPINS: resolve collect + continue
+  if(mode==="FreeSpins"){
+    applyCollectorProgress();
+
+    const win = collectCashfishIfCollectorPresent();
+    lastWin = win;
+
+    if(win>0){
+      balance = +(balance + win).toFixed(2);
+      msg.textContent = `COLLECT £${fmtMoney(win)} (x${bonusMultiplier})`;
+      animateWinTo(win);
+      maybeBigWinOverlay(win);
+    }else{
+      msg.textContent = "No collect.";
+      barWin.textContent = "£0.00";
+    }
+
+    freeSpinsLeft = Math.max(0, freeSpinsLeft - 1);
+    barInfo.innerHTML = `FREE SPINS LEFT: <b>${freeSpinsLeft}</b> · x${bonusMultiplier}`;
+    updateUI();
+
+    spinning = false;
+    setDisabled(false);
+
+    if(auto || freeSpinsLeft > 0){
+      if(freeSpinsLeft > 0){
+        setTimeout(()=>spin(), 700);
+      }else{
+        setTimeout(()=>exitBonus(), 700);
+      }
+    }
+    return;
+  }
+
+  // BASE: scatter tease respin
+  if(scatters===2 && teaseConditionMet() && teaseRespinsUsed < 1){
+    teaseRespinsUsed++;
+    msg.textContent = "Scatter tease… RESPIN!";
+    barInfo.textContent = "RESPIN";
+    spinning = false;
+    setDisabled(false);
+    setTimeout(()=>spin(), 450);
+    return;
+  }
+
+  // BASE: bonus trigger
+  if(scatters >= 3){
+    msg.textContent = `BONUS TRIGGER! (${scatters} Scatters)`;
+    barInfo.textContent = "BONUS TRIGGERED";
+    lastWin = 0;
+    updateUI();
+
+    spinning = false;
+    setDisabled(false);
+
+    bonusText.textContent = `You triggered 10 Free Spins!`;
+    bonusOverlay.style.display = "flex";
+    return;
+  }
+
+  // BASE: cluster pays
+  const win = evaluateClustersWin();
+  lastWin = win;
+
+  if(win > 0){
+    balance = +(balance + win).toFixed(2);
+    msg.textContent = `WIN £${fmtMoney(win)}`;
+    barInfo.textContent = "WIN";
+    animateWinTo(win);
+    maybeBigWinOverlay(win);
+  }else{
+    msg.textContent = "No win.";
+    barInfo.textContent = "NO WIN";
+    barWin.textContent = "£0.00";
+  }
+
+  teaseRespinsUsed = 0;
+
+  updateUI();
+  spinning = false;
+  setDisabled(false);
+
+  if(auto) setTimeout(()=>spin(), 650);
+}
+
+/* --- hook bonus start button to real bonus start --- */
+bonusStartBtn.addEventListener("click", ()=>{
+  bonusOverlay.style.display="none";
+  enterBonus();
+  setTimeout(()=>spin(), 500);
+});
+
+/* --- improve updateUI now that we have more state --- */
+function updateUI(){
+  balEl.textContent = fmtMoney(balance);
+  betEl.textContent = fmtMoney(bet);
+  lastEl.textContent = fmtMoney(lastWin);
+  modeTxt.textContent = (mode==="FreeSpins") ? "Free Spins" : "Base";
+
+  if(mode==="FreeSpins"){
+    modePill.style.borderColor = "rgba(255,207,90,.45)";
+    banner.textContent = `FREE SPINS · x${bonusMultiplier}`;
+  }else{
+    modePill.style.borderColor = "rgba(255,255,255,.10)";
+  }
+}
+
+/* --- make sure buttons re-enable after spin --- */
+function setDisabled(v){
+  spinBtn.disabled = v;
+  betDownBtn.disabled = v || mode==="FreeSpins";
+  betUpBtn.disabled = v || mode==="FreeSpins";
+  maxBetBtn.disabled = v || mode==="FreeSpins";
+  autoBtn.disabled = v ? true : false;
+}
+
+/* --- init again (safe) --- */
+createGrid();
+updateUI();
+
 </script>
+</body>
+</html>
