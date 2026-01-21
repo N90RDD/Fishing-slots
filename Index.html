@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+  <meta name="theme-color" content="#0b0e14"/>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <title>Big Bass-Style Fishing Slots</title>
+  <style>
+    :root{
+      --bg:#0b0e14; --panel:rgba(255,255,255,.06); --stroke:rgba(255,255,255,.14);
+      --text:#e6e6e6; --muted:rgba(230,230,230,.75);
+      --good:#7bffb2; --warn:#ffcf5a; --bad:#ff6b6b;
+    }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body{ height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      overscroll-behavior:none; touch-action:manipulation;
+    }
+    .wrap{
+      min-height:100%;
+      display:grid;
+      grid-template-rows:auto auto 1fr auto;
+      gap:10px;
+      padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
+              calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+      max-width:980px;
+      margin:0 auto;
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+    .pill{
+      padding:10px 12px; border:1px solid var(--stroke); border-radius:999px;
+      background:var(--panel); backdrop-filter:blur(6px); user-select:none;
+      display:flex; gap:8px; align-items:center;
+    }
+    .btn{
+      cursor:pointer; padding:12px 14px; border-radius:14px;
+      border:1px solid var(--stroke); background:var(--panel); color:var(--text);
+      user-select:none;
+    }
+    .btn:active{ transform:scale(.98); }
+    .btn.primary{ border-color:rgba(123,255,178,.35); background:rgba(123,255,178,.10); font-weight:900; }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .machine{ display:grid; gap:10px; align-content:start; min-height:0; }
+    .reels{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      background:#0f1522;
+      box-shadow:0 10px 40px rgba(0,0,0,.35);
+      padding:12px;
+      display:grid;
+      gap:10px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap:10px;
+    }
+    .cell{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      background:rgba(255,255,255,.03);
+      display:grid;
+      place-items:center;
+      min-height:84px;
+      position:relative;
+      overflow:hidden;
+    }
+    .sym{ font-size: clamp(30px, 6.6vw, 54px); line-height:1; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+    .tag{
+      position:absolute; top:8px; left:10px;
+      font-size:11px; color:var(--muted);
+      padding:3px 7px; border-radius:999px; border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+    }
+    .cash{
+      position:absolute; bottom:8px; right:10px;
+      font-size:12px; font-weight:900;
+      padding:3px 7px; border-radius:999px;
+      border:1px solid rgba(255,207,90,.32);
+      background:rgba(255,207,90,.10);
+      color:rgba(255,207,90,.95);
+      display:none;
+    }
+
+    .msg{
+      padding:12px 14px;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      background:rgba(255,255,255,.04);
+      color:var(--muted);
+      min-height:58px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .msg strong{ color:var(--text); }
+
+    .pay{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      background:rgba(255,255,255,.03);
+      padding:12px 14px;
+      color:var(--muted);
+      font-size:14px;
+    }
+    .pay h3{ margin:0 0 6px; color:var(--text); font-size:14px; }
+    .paygrid{ display:grid; grid-template-columns: 1fr auto; gap:6px 14px; }
+
+    .winGlow{ outline:2px solid rgba(123,255,178,.55); box-shadow:0 0 0 4px rgba(123,255,178,.08), 0 12px 40px rgba(0,0,0,.35); }
+    .featureGlow{ outline:2px solid rgba(255,207,90,.70); }
+
+    .footer{ font-size:13px; color:var(--muted); text-align:center; line-height:1.35; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="row">
+    <div class="pill">Balance: <strong id="bal">10000</strong></div>
+    <div class="pill">Bet: <strong id="bet">100</strong></div>
+    <div class="pill">Last Win: <strong id="last">0</strong></div>
+    <div class="pill">Mode: <strong id="mode">Base</strong></div>
+  </div>
+
+  <div class="row">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <button class="btn" id="betDown">- Bet</button>
+      <button class="btn" id="betUp">+ Bet</button>
+      <button class="btn" id="maxBet">Max Bet</button>
+      <button class="btn" id="mute" aria-pressed="false">Sound: On</button>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <button class="btn primary" id="spin" style="min-width:220px;">SPIN</button>
+      <button class="btn" id="auto" style="min-width:140px;">Auto: Off</button>
+    </div>
+  </div>
+
+  <div class="machine">
+    <div class="reels">
+      <div class="grid" id="grid"></div>
+      <div class="msg" id="msg">
+        <span>Wild 🃏 • Scatter 🌟 (3+ = Free Spins) • Cash Fish 🐟💰 + Collector 🎣 in Free Spins</span>
+        <span style="font-size:13px;">For fun only</span>
+      </div>
+      <div class="pay">
+        <h3>Paytable (WAYS: left→right, 3/4/5 of a kind)</h3>
+        <div class="paygrid" id="payGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Install: Android → “Add to Home screen”. iPhone → Share → “Add to Home Screen”. (Needs HTTPS hosting.)
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------------------------
+  // Big Bass-style: feature summary
+  // ---------------------------
+  // Base: normal ways wins (L->R), Wild substitutes.
+  // Scatter (3+) triggers Free Spins.
+  // In Free Spins: "Cash Fish" show random values (x bet). "Collector" collects ALL fish values currently visible.
+  // (This is the core Big Bass vibe. We keep it original with emoji art.)
+
+  const REELS = 5, ROWS = 3;
+
+  // ---- Symbols ----
+  const SymType = { REG:"REG", WILD:"WILD", SCAT:"SCAT", CASH:"CASH", COL:"COL" };
+
+  // Regular pays are multipliers. Total win = ways * payMult * bet.
+  const SYM = {
+    A: {k:"A", e:"🦐", n:"Shrimp", t:SymType.REG, w:22, pay:{3:2,4:4,5:8}},
+    B: {k:"B", e:"🦀", n:"Crab",   t:SymType.REG, w:18, pay:{3:3,4:6,5:12}},
+    C: {k:"C", e:"🐟", n:"Fish",   t:SymType.REG, w:16, pay:{3:4,4:8,5:16}},
+    D: {k:"D", e:"🦑", n:"Squid",  t:SymType.REG, w:12, pay:{3:6,4:12,5:24}},
+    E: {k:"E", e:"🧰", n:"Chest",  t:SymType.REG, w:9,  pay:{3:9,4:18,5:40}},
+    F: {k:"F", e:"7️⃣", n:"Seven", t:SymType.REG, w:5,  pay:{3:14,4:35,5:90}},
+
+    W: {k:"W", e:"🃏", n:"Wild",   t:SymType.WILD, w:6},
+    S: {k:"S", e:"🌟", n:"Scatter",t:SymType.SCAT, w:4},
+
+    // Feature symbols (mostly appear in Free Spins)
+    $: {k:"$", e:"🐟", n:"Cash Fish", t:SymType.CASH, w:0},  // value set per cell
+    K: {k:"K", e:"🎣", n:"Collector",t:SymType.COL,  w:0},
+  };
+  const REG_KEYS = ["A","B","C","D","E","F"];
+  const ALL_BASE_KEYS = ["A","B","C","D","E","F","W","S"]; // base spin pool
+
+  // ---- Feature config ----
+  const FREE_SPINS_AWARD = {3:10, 4:15, 5:20};
+  const RETRIG_AWARD     = {3:5,  4:8,  5:12};
+
+  // Cash fish values are multipliers of bet. Tune these.
+  const CASH_VALUES = [1,1,2,2,3,4,5,6,8,10,12,15,20,25,30,40,50];
+
+  // Free spins symbol chances (per cell)
+  // (Higher = more of that thing.)
+  const FS_CHANCE = {
+    cash: 0.20,      // 20% cells become cash fish
+    collector: 0.06, // 6% cells become collector
+    scatter: 0.06,   // can retrigger
+    wild: 0.08,      // more wilds in FS
+  };
+
+  // ---- UI ----
+  const gridEl = document.getElementById("grid");
+  const payGridEl = document.getElementById("payGrid");
+  const elBal = document.getElementById("bal");
+  const elBet = document.getElementById("bet");
+  const elLast = document.getElementById("last");
+  const elMode = document.getElementById("mode");
+  const elMsg = document.getElementById("msg");
+
+  const btnSpin = document.getElementById("spin");
+  const btnAuto = document.getElementById("auto");
+  const btnBetUp = document.getElementById("betUp");
+  const btnBetDown = document.getElementById("betDown");
+  const btnMaxBet = document.getElementById("maxBet");
+  const btnMute = document.getElementById("mute");
+
+  // ---- Audio (simple synth) ----
+  let audioCtx=null, muted=false;
+  function ensureAudio(){
+    if (muted) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+  }
+  function beep({freq=440,dur=0.08,type="sine",vol=0.06,slideTo=null}={}){
+    if (muted) return;
+    ensureAudio(); if(!audioCtx) return;
+    const t0=audioCtx.currentTime;
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.type=type;
+    osc.frequency.setValueAtTime(freq,t0);
+    if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo,t0+dur);
+    gain.gain.setValueAtTime(0.0001,t0);
+    gain.gain.exponentialRampToValueAtTime(vol,t0+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  const sfx={
+    spin:()=>beep({freq:220,slideTo:360,dur:0.11,type:"triangle",vol:0.05}),
+    stop:()=>beep({freq:420,dur:0.05,type:"sine",vol:0.03}),
+    tick:()=>beep({freq:520,dur:0.03,type:"sine",vol:0.02}),
+    win:()=>beep({freq:660,slideTo:990,dur:0.10,type:"triangle",vol:0.07}),
+    big:()=>{beep({freq:880,slideTo:1320,dur:0.12,type:"sawtooth",vol:0.06}); setTimeout(()=>beep({freq:660,slideTo:990,dur:0.10,type:"triangle",vol:0.06}),85);},
+    free:()=>beep({freq:740,slideTo:1200,dur:0.16,type:"triangle",vol:0.07}),
+    collect:()=>beep({freq:500,slideTo:900,dur:0.12,type:"square",vol:0.06}),
+    lose:()=>beep({freq:220,slideTo:160,dur:0.14,type:"sine",vol:0.05})
+  };
+
+  // ---- Persistence ----
+  const LS="bigbass_pwa_v1";
+  const saved = JSON.parse(localStorage.getItem(LS)||"null");
+  let balance = saved?.balance ?? 10000;
+  let bet = saved?.bet ?? 100;
+  muted = saved?.muted ?? false;
+
+  let lastWin=0, auto=false, spinning=false;
+  let freeSpins=0, featureTotal=0;
+
+  // Grid cells contain: {sym: SYM.*, cashMult?: number}
+  let grid = Array.from({length:ROWS}, ()=>Array.from({length:REELS}, ()=>({sym:SYM.A, cashMult:0})));
+
+  function save(){ localStorage.setItem(LS, JSON.stringify({balance, bet, muted})); }
+  const fmt = n => Math.max(0, Math.floor(n)).toString();
+
+  function setMsg(text, tone=""){
+    elMsg.style.borderColor = tone==="good" ? "rgba(123,255,178,.35)"
+      : tone==="warn" ? "rgba(255,207,90,.35)"
+      : tone==="bad"  ? "rgba(255,107,107,.35)"
+      : "rgba(255,255,255,.12)";
+    elMsg.style.color = tone==="good" ? "rgba(123,255,178,.95)"
+      : tone==="warn" ? "rgba(255,207,90,.95)"
+      : tone==="bad"  ? "rgba(255,107,107,.95)"
+      : "rgba(230,230,230,.75)";
+    elMsg.innerHTML = `<span>${text}</span><span style="font-size:13px;">For fun only</span>`;
+  }
+
+  function renderTop(){
+    elBal.textContent = fmt(balance);
+    elBet.textContent = fmt(bet);
+    elLast.textContent = fmt(lastWin);
+    elMode.textContent = freeSpins>0 ? `Free Spins (${freeSpins})` : "Base";
+    btnAuto.textContent = auto ? "Auto: On" : "Auto: Off";
+    btnMute.textContent = muted ? "Sound: Off" : "Sound: On";
+    btnMute.setAttribute("aria-pressed", String(!muted));
+
+    const cost = freeSpins>0 ? 0 : bet;
+    btnSpin.disabled = spinning || balance < cost;
+    btnBetUp.disabled = spinning;
+    btnBetDown.disabled = spinning;
+    btnMaxBet.disabled = spinning;
+  }
+
+  function buildPaytable(){
+    const list = REG_KEYS.map(k=>SYM[k]).sort((a,b)=>(b.pay[5]||0)-(a.pay[5]||0));
+    payGridEl.innerHTML="";
+    for(const s of list){
+      const l=document.createElement("div"); l.textContent = `${s.e} ${s.n}`;
+      const r=document.createElement("div"); r.style.textAlign="right";
+      r.textContent = `3=${s.pay[3]}  4=${s.pay[4]}  5=${s.pay[5]}`;
+      payGridEl.appendChild(l); payGridEl.appendChild(r);
+    }
+    const l2=document.createElement("div"); l2.textContent="🃏 Wild (substitutes)";
+    const r2=document.createElement("div"); r2.style.textAlign="right";
+    r2.textContent="🌟 Scatter → Free Spins • 🎣 collects 🐟💰 in FS";
+    payGridEl.appendChild(l2); payGridEl.appendChild(r2);
+  }
+
+  function drawGrid(){
+    gridEl.innerHTML="";
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        const cell=document.createElement("div");
+        cell.className="cell";
+        const s=document.createElement("div");
+        s.className="sym";
+        const sym=grid[r][c].sym;
+        s.textContent = (sym.t===SymType.CASH) ? "🐟💰" : sym.e;
+        cell.appendChild(s);
+
+        const tag=document.createElement("div");
+        tag.className="tag";
+        tag.textContent = sym.t===SymType.WILD ? "WILD"
+                      : sym.t===SymType.SCAT ? "SCAT"
+                      : sym.t===SymType.COL  ? "COLLECT"
+                      : sym.t===SymType.CASH ? "CASH"
+                      : "";
+        if(!tag.textContent) tag.style.display="none";
+        cell.appendChild(tag);
+
+        const cash=document.createElement("div");
+        cash.className="cash";
+        if(sym.t===SymType.CASH){
+          cash.style.display="block";
+          cash.textContent = `x${grid[r][c].cashMult}`;
+        }
+        cell.appendChild(cash);
+
+        cell.dataset.r=r; cell.dataset.c=c;
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function clearHighlights(){
+    gridEl.querySelectorAll(".cell").forEach(x=>{
+      x.classList.remove("winGlow");
+      x.classList.remove("featureGlow");
+    });
+  }
+
+  function highlightWhere(pred, className){
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if(pred(grid[r][c], r, c)){
+          const idx=r*REELS + c;
+          gridEl.children[idx]?.classList.add(className);
+        }
+      }
+    }
+  }
+
+  // ---- Random helpers ----
+  const baseBag = (() => {
+    const bag=[];
+    for(const k of ALL_BASE_KEYS){
+      const w = SYM[k].w || 1;
+      for(let i=0;i<w;i++) bag.push(SYM[k]);
+    }
+    return bag;
+  })();
+  function pickBaseSym(){
+    return baseBag[(Math.random()*baseBag.length)|0];
+  }
+  function pickCashMult(){
+    return CASH_VALUES[(Math.random()*CASH_VALUES.length)|0];
+  }
+
+  // ---- Reel animation ----
+  function animateReelStop(reelIndex, finalCol, durationMs){
+    return new Promise(resolve=>{
+      const start=performance.now();
+      let lastSwap=0;
+      function step(t){
+        const elapsed=t-start;
+        if(elapsed>=durationMs){
+          for(let r=0;r<ROWS;r++) grid[r][reelIndex] = finalCol[r];
+          drawGrid();
+          sfx.stop();
+          resolve();
+          return;
+        }
+        if(t-lastSwap>55){
+          for(let r=0;r<ROWS;r++){
+            // flicker with base symbols (looks fine)
+            grid[r][reelIndex] = {sym: pickBaseSym(), cashMult:0};
+          }
+          drawGrid();
+          if(Math.random()<0.35) sfx.tick();
+          lastSwap=t;
+        }
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function spinGrid({fast=false}={}){
+    const finalCols = Array.from({length:REELS}, ()=>Array.from({length:ROWS}, ()=>({sym:SYM.A,cashMult:0})));
+
+    for(let c=0;c<REELS;c++){
+      for(let r=0;r<ROWS;r++){
+        finalCols[c][r] = rollCellSymbol();
+      }
+    }
+
+    const base = fast?280:560;
+    const stagger = fast?90:140;
+    sfx.spin();
+    await Promise.all(Array.from({length:REELS}, (_,i)=>animateReelStop(i, finalCols[i], base + stagger*i)));
+  }
+
+  // Feature-aware rolling
+  function rollCellSymbol(){
+    // In Free Spins, sprinkle cash fish + collectors.
+    if (freeSpins > 0){
+      const roll = Math.random();
+      if (roll < FS_CHANCE.collector){
+        return {sym: SYM.K, cashMult:0};
+      }
+      if (roll < FS_CHANCE.collector + FS_CHANCE.cash){
+        return {sym: SYM.$, cashMult: pickCashMult()};
+      }
+      if (roll < FS_CHANCE.collector + FS_CHANCE.cash + FS_CHANCE.scatter){
+        return {sym: SYM.S, cashMult:0};
+      }
+      if (roll < FS_CHANCE.collector + FS_CHANCE.cash + FS_CHANCE.scatter + FS_CHANCE.wild){
+        return {sym: SYM.W, cashMult:0};
+      }
+      // otherwise regular symbol
+      const s = SYM[REG_KEYS[(Math.random()*REG_KEYS.length)|0]];
+      return {sym:s, cashMult:0};
+    }
+
+    // Base game: normal pool
+    return {sym: pickBaseSym(), cashMult:0};
+  }
+
+  // ---- WAYS win evaluation (regular symbols only) ----
+  function evalWays(){
+    const wins=[];
+    for(const k of REG_KEYS){
+      const target = SYM[k];
+      const counts=[];
+      for(let c=0;c<REELS;c++){
+        let count=0;
+        for(let r=0;r<ROWS;r++){
+          const cell = grid[r][c].sym;
+          if(cell.k===k || cell.t===SymType.WILD) count++;
+        }
+        counts.push(count);
+        if(count===0) break;
+      }
+      let len=0;
+      for(let i=0;i<counts.length;i++){ if(counts[i]>0) len++; else break; }
+      if(len>=3){
+        const ways = counts.slice(0,len).reduce((a,b)=>a*b,1);
+        const payMult = target.pay[len] || 0;
+        const amount = ways * payMult * bet;
+        if(amount>0) wins.push({k, len, ways, payMult, amount});
+      }
+    }
+    wins.sort((a,b)=>b.amount-a.amount);
+    return wins;
+  }
+
+  function countSym(type){
+    let n=0;
+    for(let r=0;r<ROWS;r++) for(let c=0;c<REELS;c++) if(grid[r][c].sym.t===type) n++;
+    return n;
+  }
+
+  function collectFishIfCollector(){
+    // For each collector on grid, collect all current cash fish (like “fishermen collect cash fish”)
+    const collectors = countSym(SymType.COL);
+    if(collectors <= 0) return 0;
+
+    let fishTotal = 0;
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if(grid[r][c].sym.t===SymType.CASH){
+          fishTotal += grid[r][c].cashMult * bet;
+        }
+      }
+    }
+    if (fishTotal <= 0) return 0;
+
+    // If multiple collectors land, you can choose to multiply. We'll do: each collector collects the fish total once.
+    // (Feels spicy without going crazy.)
+    const collected = fishTotal * collectors;
+
+    // Clear cash fish after collection (feels correct)
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<REELS;c++){
+        if(grid[r][c].sym.t===SymType.CASH){
+          grid[r][c] = {sym: SYM[REG_KEYS[(Math.random()*REG_KEYS.length)|0]], cashMult:0};
+        }
+      }
+    }
+    drawGrid();
+
+    // Highlight collectors
+    clearHighlights();
+    highlightWhere(cell => cell.sym.t===SymType.COL, "featureGlow");
+    sfx.collect();
+
+    return collected;
+  }
+
+  async function rollupWin(amount){
+    // simple roll-up to feel like online slots
+    if(amount<=0) return;
+    const start = performance.now();
+    const dur = Math.min(1200, 300 + Math.log10(amount+1)*400);
+    const from = Number(elLast.textContent)||0;
+    return new Promise(resolve=>{
+      function step(t){
+        const p = Math.min(1, (t-start)/dur);
+        const eased = 1 - Math.pow(1-p, 3);
+        elLast.textContent = fmt(from + amount*eased);
+        if(p<1) requestAnimationFrame(step);
+        else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  // ---- Main spin ----
+  async function spinOnce({fast=false}={}){
+    if(spinning) return;
+    ensureAudio();
+
+    spinning=true;
+    clearHighlights();
+    lastWin=0;
+    renderTop();
+
+    const isFree = freeSpins>0;
+    const cost = isFree ? 0 : bet;
+    if(balance < cost){
+      spinning=false;
+      setMsg("Not enough balance to spin.", "bad");
+      sfx.lose();
+      renderTop();
+      return;
+    }
+
+    if(isFree) freeSpins -= 1;
+    else balance -= bet;
+
+    renderTop();
+    await spinGrid({fast});
+
+    // Evaluate base ways
+    const wins = evalWays();
+    let totalWin = 0;
+
+    if(wins.length){
+      totalWin += wins.reduce((s,w)=>s+w.amount,0);
+      // Highlight all regular-symbol+wild cells in first 3 reels for the top symbol (simple nice look)
+      const top = wins[0];
+      highlightWhere(cell => (cell.sym.k===top.k || cell.sym.t===SymType.WILD), "winGlow");
+    }
+
+    // Scatter → (re)trigger free spins
+    const scatters = countSym(SymType.SCAT);
+    if(scatters >= 3){
+      highlightWhere(cell => cell.sym.t===SymType.SCAT, "featureGlow");
+      const add = isFree ? (RETRIG_AWARD[scatters]||0) : (FREE_SPINS_AWARD[scatters]||0);
+      if(add>0){
+        freeSpins += add;
+        setMsg(`🌟 ${scatters} Scatters! +${add} Free Spins`, "warn");
+        sfx.free();
+      }
+    }
+
+    // Free Spins “Cash Fish + Collector”
+    if(isFree){
+      const collected = collectFishIfCollector();
+      if(collected>0){
+        totalWin += collected;
+        setMsg(`🎣 Collector! Collected <strong>${fmt(collected)}</strong> from Cash Fish`, "good");
+      }
+    }
+
+    // Apply winnings
+    if(totalWin>0){
+      balance += totalWin;
+      lastWin = totalWin;
+      if(isFree) featureTotal += totalWin;
+
+      // Sound based on size
+      (totalWin >= bet*60 ? sfx.big : sfx.win)();
+      await rollupWin(totalWin);
+
+      if(!isFree){
+        setMsg(`WIN: <strong>${fmt(totalWin)}</strong>`, "good");
+      } else {
+        setMsg(`WIN: <strong>${fmt(totalWin)}</strong> • Free Spins left: <strong>${freeSpins}</strong>`, "good");
+      }
+    } else {
+      sfx.lose();
+      setMsg(isFree ? `No win • Free Spins left: <strong>${freeSpins}</strong>` : "No win.", "");
+    }
+
+    // End of feature summary
+    if(isFree && freeSpins===0){
+      setMsg(`Free Spins complete. Feature total: <strong>${fmt(featureTotal)}</strong>`, "warn");
+      featureTotal=0;
+    }
+
+    spinning=false;
+    save();
+    renderTop();
+
+    if(auto){
+      await new Promise(r=>setTimeout(r, fast?80:220));
+      spinOnce({fast});
+    }
+  }
+
+  // ---- Controls ----
+  function setBet(newBet){
+    bet = Math.max(50, Math.min(newBet, 500));
+    save(); renderTop();
+  }
+
+  btnSpin.addEventListener("click", ()=>spinOnce());
+  btnAuto.addEventListener("click", ()=>{
+    ensureAudio();
+    auto = !auto;
+    renderTop();
+    if(auto && !spinning) spinOnce();
+  });
+  btnBetUp.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(bet+50); });
+  btnBetDown.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(bet-50); });
+  btnMaxBet.addEventListener("click", ()=>{ ensureAudio(); if(!spinning) setBet(500); });
+
+  btnMute.addEventListener("click", ()=>{
+    ensureAudio();
+    muted = !muted;
+    save();
+    renderTop();
+  });
+
+  // iPhone: unlock audio on first interaction
+  document.addEventListener("pointerdown", ()=>ensureAudio(), {once:true});
+
+  // PWA service worker
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+    });
+  }
+
+  // Init
+  buildPaytable();
+  // seed grid with base symbols
+  for(let c=0;c<REELS;c++) for(let r=0;r<ROWS;r++) grid[r][c] = {sym: pickBaseSym(), cashMult:0};
+  drawGrid();
+  renderTop();
+  setMsg("Ready. Get 3+ 🌟 for Free Spins. In Free Spins, 🎣 collects 🐟💰 values.", "");
+  save();
+
+  // Hold-to-fast-spin on mobile
+  let holdTimer=null, holding=false;
+  btnSpin.addEventListener("pointerdown",(e)=>{
+    if(e.pointerType==="mouse") return;
+    holding=true;
+    holdTimer=setTimeout(()=>{ if(holding && !spinning) spinOnce({fast:true}); }, 220);
+  });
+  const endHold=()=>{ holding=false; if(holdTimer) clearTimeout(holdTimer); holdTimer=null; };
+  btnSpin.addEventListener("pointerup", endHold);
+  btnSpin.addEventListener("pointercancel", endHold);
+  btnSpin.addEventListener("pointerleave", endHold);
+
+})();
+</script>
+</body>
+</html>
